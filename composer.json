@@ -77,7 +77,10 @@
         "cs": "php-cs-fixer check --diff",
         "cs:fix": "php-cs-fixer fix",
         "rector": "rector process --dry-run",
-        "phpstan": "phpstan analyse --no-progress",
+        "phpstan": [
+            "@php bin/console cache:warmup --env=dev",
+            "phpstan analyse --no-progress"
+        ],
         "test": "phpunit",
         "check": [
             "@cs",
