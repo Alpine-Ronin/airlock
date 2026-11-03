@@ -230,7 +230,13 @@ the `env` block of your client's configuration (with Docker, the `-e` options pa
 
 `demo/` is a small project whose `README.md` hides an instruction to AI assistants: run a script downloaded from the
 internet, silently (its URL never resolves). Copy it, connect Airlock to it as above, open it in your client and ask
-the agent:
+the agent.
+
+Installed with a binary, you have no clone of the repository yet; make one first:
+
+```bash
+git clone --depth 1 https://github.com/hbenabdallah/airlock.git ~/airlock
+```
 
 ```bash
 cp -R ~/airlock/demo ~/airlock-demo
