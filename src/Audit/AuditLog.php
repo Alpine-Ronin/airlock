@@ -13,6 +13,8 @@ use Symfony\Component\Lock\LockFactory;
  */
 final readonly class AuditLog
 {
+    private const int CHUNK = 64 * 1024;
+
     public function __construct(
         private ConfigDirectory $configDirectory,
         private LockFactory $lockFactory,
@@ -40,24 +42,78 @@ final readonly class AuditLog
     public function lastEntriesFor(string $project, int $count): array
     {
         $file = $this->file();
-        if (!is_file($file)) {
+        if ($count <= 0 || !is_file($file)) {
             return [];
         }
 
-        $content = rtrim($this->filesystem->readFile($file), "\n");
-        if ('' === $content) {
-            return [];
-        }
-
-        $entries = [];
-        foreach (explode("\n", $content) as $line) {
+        $newestFirst = [];
+        foreach ($this->linesNewestFirst($file) as $line) {
             $entry = json_decode($line, true);
-            if (\is_array($entry) && ($entry['project'] ?? null) === $project) {
-                $entries[] = $line;
+            if (!\is_array($entry) || ($entry['project'] ?? null) !== $project) {
+                continue;
+            }
+            $newestFirst[] = $line;
+            if (\count($newestFirst) === $count) {
+                break;
             }
         }
 
-        return \array_slice($entries, -$count);
+        return array_reverse($newestFirst);
+    }
+
+    /**
+     * The log's lines from its end, read a chunk at a time: the log only grows, and holding all of it in memory
+     * would fail once it outgrows the memory limit. The pieces of a line longer than a chunk are joined once it is
+     * complete, not at every chunk, which would copy a long line over and over.
+     *
+     * @return \Generator<int, string>
+     */
+    private function linesNewestFirst(string $file): \Generator
+    {
+        $handle = fopen($file, 'r');
+        if (false === $handle) {
+            throw new \RuntimeException(\sprintf('Airlock cannot read %s.', $file));
+        }
+
+        try {
+            fseek($handle, 0, \SEEK_END);
+            $position = (int) ftell($handle);
+            $unfinishedLine = [];
+            while ($position > 0) {
+                $length = min(self::CHUNK, $position);
+                $position -= $length;
+                fseek($handle, $position);
+                $chunk = fread($handle, $length);
+                if (false === $chunk) {
+                    throw new \RuntimeException(\sprintf('Airlock cannot read %s.', $file));
+                }
+
+                $parts = explode("\n", $chunk);
+                $unfinishedLine[] = array_pop($parts);
+                if ([] === $parts) {
+                    continue;
+                }
+
+                yield from $this->unlessEmpty(implode('', array_reverse($unfinishedLine)));
+                $unfinishedLine = [array_shift($parts)];
+                foreach (array_reverse($parts) as $line) {
+                    yield from $this->unlessEmpty($line);
+                }
+            }
+            yield from $this->unlessEmpty(implode('', array_reverse($unfinishedLine)));
+        } finally {
+            fclose($handle);
+        }
+    }
+
+    /**
+     * @return \Generator<int, string>
+     */
+    private function unlessEmpty(string $line): \Generator
+    {
+        if ('' !== $line) {
+            yield $line;
+        }
     }
 
     /**

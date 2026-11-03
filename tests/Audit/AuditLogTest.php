@@ -115,13 +115,95 @@ final class AuditLogTest extends TestCase
             $this->log->append($this->entry('/other', $command));
         }
 
-        $commands = array_map(static function (string $line): mixed {
+        self::assertSame(['b', 'c'], $this->commandsOf($this->log->lastEntriesFor('/project', 2)));
+    }
+
+    public function testTheLastEntriesAreReadWithoutLoadingTheWholeLog(): void
+    {
+        $this->log->append($this->entry('/project', 'a'));
+        $otherProject = json_encode($this->entry('/other', str_repeat('x', 900))->toArray(), \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES)."\n";
+        $handle = fopen(self::LOG, 'a');
+        self::assertIsResource($handle);
+        for ($kibibyte = 0; $kibibyte < 32 * 1024; ++$kibibyte) {
+            fwrite($handle, $otherProject);
+        }
+        fclose($handle);
+        $this->log->append($this->entry('/project', 'b'));
+        $this->log->append($this->entry('/project', 'c'));
+        $memoryLimit = \ini_get('memory_limit');
+
+        ini_set('memory_limit', (string) (memory_get_usage() + 16 * 1024 * 1024));
+        try {
+            $lastEntries = $this->log->lastEntriesFor('/project', 2);
+        } finally {
+            ini_set('memory_limit', $memoryLimit);
+        }
+
+        self::assertSame(['b', 'c'], $this->commandsOf($lastEntries));
+    }
+
+    public function testAHugeEntryBeforeTheOnesAskedForIsNotRead(): void
+    {
+        $this->log->append($this->entry('/other', str_repeat('x', 32 * 1024 * 1024)));
+        $this->log->append($this->entry('/project', 'b'));
+        $this->log->append($this->entry('/project', 'c'));
+        $memoryLimit = \ini_get('memory_limit');
+
+        ini_set('memory_limit', (string) (memory_get_usage() + 16 * 1024 * 1024));
+        try {
+            $lastEntries = $this->log->lastEntriesFor('/project', 2);
+        } finally {
+            ini_set('memory_limit', $memoryLimit);
+        }
+
+        self::assertSame(['b', 'c'], $this->commandsOf($lastEntries));
+    }
+
+    public function testEntriesAcrossEveryChunkBoundaryComeBackWholeAndInOrder(): void
+    {
+        $commands = [];
+        for ($entry = 0; $entry < 400; ++$entry) {
+            $commands[] = \sprintf('%d %s', $entry, str_repeat('z', ($entry * 997) % 3000));
+        }
+        foreach ($commands as $command) {
+            $this->log->append($this->entry('/project', $command));
+        }
+
+        self::assertSame($commands, $this->commandsOf($this->log->lastEntriesFor('/project', 400)));
+    }
+
+    public function testAskingForNoEntriesReadsNothing(): void
+    {
+        $this->log->append($this->entry('/project', 'a'));
+
+        self::assertSame([], $this->log->lastEntriesFor('/project', 0));
+    }
+
+    public function testAnEntryLongerThanWhatIsReadAtOnceComesBackWhole(): void
+    {
+        $longCommand = 'echo '.str_repeat('y', 300 * 1024);
+        $this->log->append($this->entry('/project', 'before'));
+        $this->log->append($this->entry('/project', $longCommand));
+        $this->log->append($this->entry('/project', 'after'));
+
+        self::assertSame(['before', $longCommand, 'after'], $this->commandsOf($this->log->lastEntriesFor('/project', 10)));
+    }
+
+    /**
+     * @param list<string> $lines
+     *
+     * @return list<string|null>
+     */
+    private function commandsOf(array $lines): array
+    {
+        $commands = [];
+        foreach ($lines as $line) {
             $entry = json_decode($line, true);
+            $command = \is_array($entry) ? $entry['command'] ?? null : null;
+            $commands[] = \is_string($command) ? $command : null;
+        }
 
-            return \is_array($entry) ? $entry['command'] ?? null : null;
-        }, $this->log->lastEntriesFor('/project', 2));
-
-        self::assertSame(['b', 'c'], $commands);
+        return $commands;
     }
 
     private function entry(string $project, string $command): AuditEntry
