@@ -10,6 +10,9 @@ COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 
 ENV APP_ENV=prod
 
+# The version Airlock reports: Composer reads it from git, which the image leaves out (a tag: --build-arg).
+ARG COMPOSER_ROOT_VERSION=dev-main
+
 WORKDIR /app
 COPY composer.json composer.lock symfony.lock ./
 RUN composer install --no-dev --no-scripts --no-autoloader --no-interaction --no-progress
