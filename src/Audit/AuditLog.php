@@ -13,6 +13,8 @@ use Symfony\Component\Lock\LockFactory;
  */
 final readonly class AuditLog
 {
+    private const int CHUNK = 64 * 1024;
+
     public function __construct(
         private ConfigDirectory $configDirectory,
         private LockFactory $lockFactory,
@@ -44,20 +46,60 @@ final readonly class AuditLog
             return [];
         }
 
-        $content = rtrim($this->filesystem->readFile($file), "\n");
-        if ('' === $content) {
-            return [];
-        }
-
-        $entries = [];
-        foreach (explode("\n", $content) as $line) {
+        $newestFirst = [];
+        foreach ($this->linesNewestFirst($file) as $line) {
+            if (\count($newestFirst) >= $count) {
+                break;
+            }
             $entry = json_decode($line, true);
             if (\is_array($entry) && ($entry['project'] ?? null) === $project) {
-                $entries[] = $line;
+                $newestFirst[] = $line;
             }
         }
 
-        return \array_slice($entries, -$count);
+        return array_reverse($newestFirst);
+    }
+
+    /**
+     * The log's lines from its end, read a chunk at a time: the log only grows, and holding all of it in memory
+     * would fail once it outgrows the memory limit.
+     *
+     * @return \Generator<int, string>
+     */
+    private function linesNewestFirst(string $file): \Generator
+    {
+        $handle = fopen($file, 'r');
+        if (false === $handle) {
+            throw new \RuntimeException(\sprintf('Airlock cannot read %s.', $file));
+        }
+
+        try {
+            fseek($handle, 0, \SEEK_END);
+            $position = (int) ftell($handle);
+            $lineStart = '';
+            while ($position > 0) {
+                $length = min(self::CHUNK, $position);
+                $position -= $length;
+                fseek($handle, $position);
+                $chunk = fread($handle, $length);
+                if (false === $chunk) {
+                    throw new \RuntimeException(\sprintf('Airlock cannot read %s.', $file));
+                }
+
+                $lines = explode("\n", $chunk.$lineStart);
+                $lineStart = array_shift($lines);
+                foreach (array_reverse($lines) as $line) {
+                    if ('' !== $line) {
+                        yield $line;
+                    }
+                }
+            }
+            if ('' !== $lineStart) {
+                yield $lineStart;
+            }
+        } finally {
+            fclose($handle);
+        }
     }
 
     /**
