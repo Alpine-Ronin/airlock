@@ -49,6 +49,7 @@ jobs:
                   path: build/airlock.phar
 
     binary:
+        name: binary (${{ matrix.target }}, ${{ matrix.os }})
         needs: phar
         strategy:
             fail-fast: false
