@@ -9,6 +9,7 @@ use App\Configuration\ModelSettings;
 use App\Configuration\ModelSettingsFile;
 use App\Mcp\OutputReport;
 use App\Tests\Output\RecordedResponses;
+use Composer\InstalledVersions;
 use PHPUnit\Framework\Attributes\RequiresOperatingSystemFamily;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
@@ -379,6 +380,23 @@ final class RunCommandOverStdioTest extends TestCase
 
         self::assertSame(3, $this->field($answer, 'id'));
         self::assertSame($this->report("ran\nran\n"), $this->text($answer, 'result', 'content', 0, 'text'));
+    }
+
+    public function testTheServerIntroducesItselfAsAirlockWithItsVersion(): void
+    {
+        $answer = $this->client()->request([
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'initialize',
+            'params' => [
+                'protocolVersion' => '2025-11-25',
+                'capabilities' => new \stdClass(),
+                'clientInfo' => ['name' => 'test', 'version' => '1'],
+            ],
+        ]);
+
+        self::assertSame('airlock', $this->field($answer, 'result', 'serverInfo', 'name'));
+        self::assertSame(InstalledVersions::getRootPackage()['pretty_version'], $this->field($answer, 'result', 'serverInfo', 'version'));
     }
 
     public function testInTheHandshakeEraTheToolIsListed(): void
