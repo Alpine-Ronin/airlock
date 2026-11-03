@@ -90,12 +90,70 @@ final readonly class ClientConfigFiles
             $this->filesystem->remove($file->path);
         } elseif ($file->isChanged()) {
             if (Direction::Connect === $direction) {
-                $this->originals->keep($file->path, $file->exists, $file->before);
+                $this->originals->keep($file->path, $file->exists, $file->before, $this->missingDirectoriesFor($file->path));
             }
             $this->filesystem->dumpFile($file->path, $file->after);
         }
         if (Direction::Disconnect === $direction) {
-            $this->originals->forget($file->path);
+            $this->disconnectRecord($file->path);
+        }
+    }
+
+    /**
+     * Forgetting the record forgets which directories connecting created: once the file is gone, whether disconnecting
+     * removed it or the user did, this is the last chance to take them back.
+     */
+    private function disconnectRecord(string $path): void
+    {
+        clearstatcache(true, $path);
+        if (!file_exists($path)) {
+            $this->removeEmptyDirectoriesCreatedFor($path);
+        }
+        $this->originals->forget($path);
+    }
+
+    /**
+     * @return list<string> the directories writing the file would create, deepest first
+     */
+    private function missingDirectoriesFor(string $path): array
+    {
+        $missing = [];
+        $directory = \dirname($path);
+        while (!is_dir($directory) && \dirname($directory) !== $directory) {
+            $missing[] = $directory;
+            $directory = \dirname($directory);
+        }
+
+        return $missing;
+    }
+
+    /**
+     * Only what connecting created, and only while empty: a directory the user had, or has put something in since,
+     * stays, and so do the ones above it.
+     */
+    private function removeEmptyDirectoriesCreatedFor(string $path): void
+    {
+        foreach ($this->originals->createdDirectories($path) as $directory) {
+            if (!is_dir($directory)) {
+                continue;
+            }
+            if (!$this->removeIfEmpty($directory)) {
+                return;
+            }
+        }
+    }
+
+    /**
+     * rmdir() itself refuses a directory that is not empty, even one something reached after any check could have
+     * run: nothing put there is lost. Its refusal is the answer, not an error, hence the warning it raises is caught.
+     */
+    private function removeIfEmpty(string $directory): bool
+    {
+        set_error_handler(static fn (): bool => true);
+        try {
+            return rmdir($directory);
+        } finally {
+            restore_error_handler();
         }
     }
 

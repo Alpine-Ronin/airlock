@@ -60,9 +60,33 @@ final readonly class ProjectGrants
                     $kept[] = $grant;
                 }
             }
-            $this->filesystem->dumpFile($this->file(), Yaml::dump(['grants' => array_map($this->normalize(...), $kept)], 3));
+            $this->writePrivately(Yaml::dump(['grants' => array_map($this->normalize(...), $kept)], 3));
         } finally {
             $lock->release();
+        }
+    }
+
+    /**
+     * Whoever can change the file can let any command run without asking: it is written readable and writable by its
+     * owner only, in directories nobody else can enter, and as a new file each time, so that one an earlier version
+     * left open, and anything someone else opened then, is replaced rather than changed.
+     */
+    private function writePrivately(string $content): void
+    {
+        $file = $this->file();
+        $directory = \dirname($file);
+        foreach ([$this->configDirectory->path, $directory] as $private) {
+            $this->filesystem->mkdir($private, 0o700);
+            $this->filesystem->chmod($private, 0o700);
+        }
+
+        $temporary = $this->filesystem->tempnam($directory, '.grants-');
+        try {
+            $this->filesystem->chmod($temporary, 0o600);
+            $this->filesystem->appendToFile($temporary, $content);
+            $this->filesystem->rename($temporary, $file, true);
+        } finally {
+            $this->filesystem->remove($temporary);
         }
     }
 

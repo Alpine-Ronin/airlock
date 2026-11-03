@@ -23,8 +23,10 @@ final readonly class ConnectionOriginals
     /**
      * Keeps the file as it is now, unless Airlock already kept it: the first original is the one that counts. The
      * record appears whole or not at all, and readable by its owner only from the start.
+     *
+     * @param list<string> $createdDirectories the directories writing the file creates, deepest first
      */
-    public function keep(string $path, bool $exists, string $content): void
+    public function keep(string $path, bool $exists, string $content, array $createdDirectories = []): void
     {
         $record = $this->recordPath($path);
         $directory = \dirname($record);
@@ -37,7 +39,8 @@ final readonly class ConnectionOriginals
         $temporary = $this->filesystem->tempnam($directory, '.original-');
         try {
             $this->filesystem->chmod($temporary, 0o600);
-            $this->filesystem->appendToFile($temporary, json_encode(['path' => $path, 'existed' => $exists, 'content' => $content], \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR));
+            $kept = ['path' => $path, 'existed' => $exists, 'content' => $content, 'created_directories' => $createdDirectories];
+            $this->filesystem->appendToFile($temporary, json_encode($kept, \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR));
             $this->filesystem->rename($temporary, $record, true);
         } finally {
             $this->filesystem->remove($temporary);
@@ -62,6 +65,30 @@ final readonly class ConnectionOriginals
         $kept = $this->record($path);
 
         return false === ($kept['existed'] ?? null);
+    }
+
+    /**
+     * The directories Airlock created to write the file, deepest first: none without a record, or with one an earlier
+     * version wrote.
+     *
+     * @return list<string>
+     */
+    public function createdDirectories(string $path): array
+    {
+        $kept = $this->record($path);
+        $directories = $kept['created_directories'] ?? [];
+        if (!\is_array($directories)) {
+            return [];
+        }
+
+        $created = [];
+        foreach ($directories as $directory) {
+            if (\is_string($directory)) {
+                $created[] = $directory;
+            }
+        }
+
+        return $created;
     }
 
     /**
