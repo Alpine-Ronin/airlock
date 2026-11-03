@@ -18,6 +18,8 @@ final class AuditLogTest extends TestCase
 {
     private const string HOME = __DIR__.'/../../var/test-audit';
 
+    private const string LOG = self::HOME.'/.config/airlock/audit.jsonl';
+
     private AuditLog $log;
 
     #[\Override]
@@ -36,6 +38,23 @@ final class AuditLogTest extends TestCase
     public function testAnEmptyLogHasNoEntries(): void
     {
         self::assertSame([], $this->log->lastEntriesFor('/project', 10));
+    }
+
+    public function testTheLogIsReadableByItsOwnerOnly(): void
+    {
+        $this->log->append($this->entry('/project', 'ls'));
+
+        self::assertSame(0o600, fileperms(self::LOG) & 0o777, 'The log holds every command run in every project.');
+    }
+
+    public function testALogAnEarlierVersionLeftOpenIsClosed(): void
+    {
+        new Filesystem()->dumpFile(self::LOG, '');
+        new Filesystem()->chmod(self::LOG, 0o644);
+
+        $this->log->append($this->entry('/project', 'ls'));
+
+        self::assertSame(0o600, fileperms(self::LOG) & 0o777);
     }
 
     public function testAnEntryIsWrittenAsOneJsonLine(): void

@@ -25,6 +25,7 @@ final readonly class AuditLog
         $lock = $this->lockFactory->createLock('airlock-audit');
         $lock->acquire(blocking: true);
         try {
+            $this->closeToOthers();
             $this->filesystem->appendToFile($this->file(), json_encode($entry->toArray(), \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES)."\n");
         } finally {
             $lock->release();
@@ -57,6 +58,19 @@ final readonly class AuditLog
         }
 
         return \array_slice($entries, -$count);
+    }
+
+    /**
+     * The log names every command run in every project: readable by its owner only, before its first entry and also
+     * when an earlier version created it open.
+     */
+    private function closeToOthers(): void
+    {
+        $file = $this->file();
+        if (!is_file($file)) {
+            $this->filesystem->dumpFile($file, '');
+        }
+        $this->filesystem->chmod($file, 0o600);
     }
 
     private function file(): string
