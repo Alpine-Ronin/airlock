@@ -10,10 +10,24 @@ use Symfony\Component\Filesystem\Filesystem;
 
 final class KernelTest extends TestCase
 {
+    private const string CACHE = __DIR__.'/../var/test-kernel';
+
+    /** @var array<mixed> */
+    private array $server;
+
+    #[\Override]
+    protected function setUp(): void
+    {
+        $this->server = $_SERVER;
+        $_SERVER['APP_CACHE_DIR'] = self::CACHE;
+        new Filesystem()->remove(self::CACHE);
+    }
+
     #[\Override]
     protected function tearDown(): void
     {
-        new Filesystem()->remove(__DIR__.'/../var/cache/staging');
+        $_SERVER = $this->server;
+        new Filesystem()->remove(self::CACHE);
     }
 
     public function testAnEnvironmentTheKernelDoesNotAllowIsRefused(): void
