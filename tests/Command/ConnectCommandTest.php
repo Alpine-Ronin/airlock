@@ -145,6 +145,17 @@ final class ConnectCommandTest extends KernelTestCase
         self::assertDirectoryExists(self::ROOT);
     }
 
+    public function testADirectoryAlreadyGoneDoesNotStopTheOnesAboveIt(): void
+    {
+        $_SERVER['CODEX_HOME'] = $_ENV['CODEX_HOME'] = self::ROOT.'/codex/home';
+        $this->tester()->execute(['client' => 'codex']);
+        $this->filesystem->remove(self::ROOT.'/codex/home');
+
+        $this->tester()->execute(['client' => 'codex', '--remove' => true]);
+
+        self::assertDirectoryDoesNotExist(self::ROOT.'/codex', 'codex/home/ is gone, but codex/ was created by connecting too.');
+    }
+
     public function testRemovingKeepsAFileConnectingCreatedOnceTheUserAddedToIt(): void
     {
         $this->tester()->execute(['client' => 'claude-code']);

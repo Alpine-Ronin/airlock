@@ -134,6 +134,9 @@ final readonly class ClientConfigFiles
     private function removeEmptyDirectoriesCreatedFor(string $path): void
     {
         foreach ($this->originals->createdDirectories($path) as $directory) {
+            if (!is_dir($directory)) {
+                continue;
+            }
             if (!$this->removeIfEmpty($directory)) {
                 return;
             }
@@ -146,10 +149,6 @@ final readonly class ClientConfigFiles
      */
     private function removeIfEmpty(string $directory): bool
     {
-        if (!is_dir($directory)) {
-            return false;
-        }
-
         set_error_handler(static fn (): bool => true);
         try {
             return rmdir($directory);
