@@ -6,6 +6,7 @@ namespace App;
 
 use Composer\InstalledVersions;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\HttpKernel\Kernel as BaseKernel;
 
 final class Kernel extends BaseKernel
@@ -13,14 +14,13 @@ final class Kernel extends BaseKernel
     use MicroKernelTrait;
 
     /**
-     * Airlock's version is the root package's: Composer takes it from the git tag a release is built from.
-     *
-     * @return array<mixed>
+     * Airlock's version is the root package's: Composer takes it from the git tag a release is built from. Set here
+     * rather than in getKernelParameters(), whose parent would no longer see getAllowedEnvs() below.
      */
     #[\Override]
-    protected function getKernelParameters(): array
+    protected function build(ContainerBuilder $container): void
     {
-        return [...parent::getKernelParameters(), 'airlock.version' => InstalledVersions::getRootPackage()['pretty_version']];
+        $container->setParameter('airlock.version', InstalledVersions::getRootPackage()['pretty_version']);
     }
 
     /**
