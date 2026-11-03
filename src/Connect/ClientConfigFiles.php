@@ -88,15 +88,55 @@ final readonly class ClientConfigFiles
     {
         if (null === $file->after) {
             $this->filesystem->remove($file->path);
+            $this->removeEmptyDirectoriesCreatedFor($file->path);
         } elseif ($file->isChanged()) {
             if (Direction::Connect === $direction) {
-                $this->originals->keep($file->path, $file->exists, $file->before);
+                $this->originals->keep($file->path, $file->exists, $file->before, $this->missingDirectoriesFor($file->path));
             }
             $this->filesystem->dumpFile($file->path, $file->after);
         }
         if (Direction::Disconnect === $direction) {
             $this->originals->forget($file->path);
         }
+    }
+
+    /**
+     * @return list<string> the directories writing the file would create, deepest first
+     */
+    private function missingDirectoriesFor(string $path): array
+    {
+        $missing = [];
+        $directory = \dirname($path);
+        while (!is_dir($directory) && \dirname($directory) !== $directory) {
+            $missing[] = $directory;
+            $directory = \dirname($directory);
+        }
+
+        return $missing;
+    }
+
+    /**
+     * Only what connecting created, and only while empty: a directory the user had, or has put something in since,
+     * stays, and so do the ones above it.
+     */
+    private function removeEmptyDirectoriesCreatedFor(string $path): void
+    {
+        foreach ($this->originals->createdDirectories($path) as $directory) {
+            if (!$this->isEmptyDirectory($directory)) {
+                return;
+            }
+            $this->filesystem->remove($directory);
+        }
+    }
+
+    private function isEmptyDirectory(string $directory): bool
+    {
+        if (!is_dir($directory)) {
+            return false;
+        }
+        $entries = scandir($directory);
+
+        return false !== $entries && [] === array_diff($entries, ['.', '..']);
     }
 
     private function isAsPlanned(PlannedFile $file): bool

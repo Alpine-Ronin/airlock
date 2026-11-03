@@ -48,6 +48,21 @@ final class ConnectionOriginalsTest extends TestCase
         self::assertTrue($this->originals->wasAbsent('/project/.mcp.json'));
     }
 
+    public function testTheDirectoriesCreatedForTheFileAreKeptWithIt(): void
+    {
+        $this->originals->keep('/project/.claude/settings.local.json', false, '', ['/project/.claude']);
+
+        self::assertSame(['/project/.claude'], $this->originals->createdDirectories('/project/.claude/settings.local.json'));
+    }
+
+    public function testARecordAnEarlierVersionWroteNamesNoCreatedDirectory(): void
+    {
+        $record = $this->originals->recordPath('/project/.mcp.json');
+        $this->filesystem->dumpFile($record, '{"path":"/project/.mcp.json","existed":false,"content":""}');
+
+        self::assertSame([], $this->originals->createdDirectories('/project/.mcp.json'));
+    }
+
     public function testAnEmptyFileIsNotTakenForAnAbsentOne(): void
     {
         $this->originals->keep('/project/.mcp.json', true, '');

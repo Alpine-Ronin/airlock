@@ -100,6 +100,39 @@ final class ConnectCommandTest extends KernelTestCase
         self::assertFileDoesNotExist(self::PROJECT.'/.mcp.json');
         self::assertFileDoesNotExist(self::PROJECT.'/.claude/settings.local.json');
         self::assertStringContainsString('.mcp.json (removed)', $tester->getDisplay());
+        self::assertDirectoryDoesNotExist(self::PROJECT.'/.claude', 'Connecting created it for settings.local.json: removing takes it back.');
+        self::assertDirectoryExists(self::PROJECT);
+    }
+
+    public function testRemovingKeepsADirectoryThatExistedBefore(): void
+    {
+        $this->filesystem->mkdir(self::PROJECT.'/.claude');
+        $this->tester()->execute(['client' => 'claude-code']);
+
+        $this->tester()->execute(['client' => 'claude-code', '--remove' => true]);
+
+        self::assertDirectoryExists(self::PROJECT.'/.claude', 'The user had it, empty as it was.');
+    }
+
+    public function testRemovingKeepsADirectoryConnectingCreatedOnceTheUserAddedToIt(): void
+    {
+        $this->tester()->execute(['client' => 'claude-code']);
+        $this->filesystem->dumpFile(self::PROJECT.'/.claude/commands/review.md', 'Review the diff.');
+
+        $this->tester()->execute(['client' => 'claude-code', '--remove' => true]);
+
+        self::assertFileExists(self::PROJECT.'/.claude/commands/review.md');
+    }
+
+    public function testRemovingTakesBackEveryDirectoryConnectingCreatedOnTheWay(): void
+    {
+        $_SERVER['CODEX_HOME'] = $_ENV['CODEX_HOME'] = self::ROOT.'/codex/home';
+        $this->tester()->execute(['client' => 'codex']);
+
+        $this->tester()->execute(['client' => 'codex', '--remove' => true]);
+
+        self::assertDirectoryDoesNotExist(self::ROOT.'/codex', 'Both codex/ and codex/home/ were created by connecting.');
+        self::assertDirectoryExists(self::ROOT);
     }
 
     public function testRemovingKeepsAFileConnectingCreatedOnceTheUserAddedToIt(): void
