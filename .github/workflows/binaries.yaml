@@ -88,7 +88,7 @@ jobs:
                   curl -fsSL -o spc.tgz "https://github.com/crazywhalecc/static-php-cli/releases/latest/download/spc-${{ matrix.target }}.tar.gz"
                   tar -xzf spc.tgz
                   if [ "$RUNNER_OS" = Linux ]; then
-                      curl -fsSL -o "$RUNNER_TEMP/musl-1.2.5.tar.gz" "$MUSL_ARCHIVE_URL"
+                      curl -fsSL --connect-timeout 20 --max-time 120 --retry 3 --retry-all-errors -o "$RUNNER_TEMP/musl-1.2.5.tar.gz" "$MUSL_ARCHIVE_URL"
                       echo "$MUSL_ARCHIVE_SHA256  $RUNNER_TEMP/musl-1.2.5.tar.gz" | sha256sum -c -
                       ./spc download musl-1.2.5 --custom-url="musl-1.2.5:file://$RUNNER_TEMP/musl-1.2.5.tar.gz"
                   fi
