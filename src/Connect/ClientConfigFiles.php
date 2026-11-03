@@ -88,7 +88,6 @@ final readonly class ClientConfigFiles
     {
         if (null === $file->after) {
             $this->filesystem->remove($file->path);
-            $this->removeEmptyDirectoriesCreatedFor($file->path);
         } elseif ($file->isChanged()) {
             if (Direction::Connect === $direction) {
                 $this->originals->keep($file->path, $file->exists, $file->before, $this->missingDirectoriesFor($file->path));
@@ -96,8 +95,21 @@ final readonly class ClientConfigFiles
             $this->filesystem->dumpFile($file->path, $file->after);
         }
         if (Direction::Disconnect === $direction) {
-            $this->originals->forget($file->path);
+            $this->disconnectRecord($file->path);
         }
+    }
+
+    /**
+     * Forgetting the record forgets which directories connecting created: once the file is gone, whether disconnecting
+     * removed it or the user did, this is the last chance to take them back.
+     */
+    private function disconnectRecord(string $path): void
+    {
+        clearstatcache(true, $path);
+        if (!file_exists($path)) {
+            $this->removeEmptyDirectoriesCreatedFor($path);
+        }
+        $this->originals->forget($path);
     }
 
     /**
@@ -122,21 +134,28 @@ final readonly class ClientConfigFiles
     private function removeEmptyDirectoriesCreatedFor(string $path): void
     {
         foreach ($this->originals->createdDirectories($path) as $directory) {
-            if (!$this->isEmptyDirectory($directory)) {
+            if (!$this->removeIfEmpty($directory)) {
                 return;
             }
-            $this->filesystem->remove($directory);
         }
     }
 
-    private function isEmptyDirectory(string $directory): bool
+    /**
+     * rmdir() itself refuses a directory that is not empty, even one something reached after any check could have
+     * run: nothing put there is lost. Its refusal is the answer, not an error, hence the warning it raises is caught.
+     */
+    private function removeIfEmpty(string $directory): bool
     {
         if (!is_dir($directory)) {
             return false;
         }
-        $entries = scandir($directory);
 
-        return false !== $entries && [] === array_diff($entries, ['.', '..']);
+        set_error_handler(static fn (): bool => true);
+        try {
+            return rmdir($directory);
+        } finally {
+            restore_error_handler();
+        }
     }
 
     private function isAsPlanned(PlannedFile $file): bool

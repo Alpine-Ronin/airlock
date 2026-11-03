@@ -104,6 +104,16 @@ final class ConnectCommandTest extends KernelTestCase
         self::assertDirectoryExists(self::PROJECT);
     }
 
+    public function testRemovingTakesBackADirectoryConnectingCreatedForAFileTheUserDeleted(): void
+    {
+        $this->tester()->execute(['client' => 'claude-code']);
+        $this->filesystem->remove(self::PROJECT.'/.claude/settings.local.json');
+
+        $this->tester()->execute(['client' => 'claude-code', '--remove' => true]);
+
+        self::assertDirectoryDoesNotExist(self::PROJECT.'/.claude', 'Removing forgets the record: it is the last chance to take the directory back.');
+    }
+
     public function testRemovingKeepsADirectoryThatExistedBefore(): void
     {
         $this->filesystem->mkdir(self::PROJECT.'/.claude');
