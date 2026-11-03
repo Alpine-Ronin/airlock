@@ -88,8 +88,8 @@ final readonly class AuditLog
     {
         $copy = $this->filesystem->tempnam(\dirname($file), '.audit-');
         try {
+            $this->filesystem->copy($file, $copy, overwriteNewerFiles: true);
             $this->filesystem->chmod($copy, 0o600);
-            $this->filesystem->appendToFile($copy, $this->filesystem->readFile($file));
             $this->filesystem->rename($copy, $file, true);
         } finally {
             $this->filesystem->remove($copy);

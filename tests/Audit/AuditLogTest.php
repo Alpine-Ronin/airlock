@@ -72,6 +72,32 @@ final class AuditLogTest extends TestCase
         self::assertCount(2, $this->log->lastEntriesFor('/project', 10), 'The earlier entries are kept.');
     }
 
+    public function testALogLeftOpenIsReplacedWithoutBeingLoadedInMemory(): void
+    {
+        $line = str_repeat('x', 1023)."\n";
+        new Filesystem()->dumpFile(self::LOG, '');
+        new Filesystem()->chmod(self::LOG, 0o644);
+        $handle = fopen(self::LOG, 'a');
+        self::assertIsResource($handle);
+        for ($kibibyte = 0; $kibibyte < 32 * 1024; ++$kibibyte) {
+            fwrite($handle, $line);
+        }
+        fclose($handle);
+        $memoryLimit = \ini_get('memory_limit');
+
+        ini_set('memory_limit', (string) (memory_get_usage() + 16 * 1024 * 1024));
+        try {
+            $this->log->append($this->entry('/project', 'ls'));
+        } finally {
+            ini_set('memory_limit', $memoryLimit);
+        }
+
+        clearstatcache();
+        $earlierEntries = 32 * 1024 * 1024;
+        $newEntry = json_encode($this->entry('/project', 'ls')->toArray(), \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES)."\n";
+        self::assertSame($earlierEntries + \strlen($newEntry), filesize(self::LOG), 'The whole log was copied, then the entry appended.');
+    }
+
     public function testAnEntryIsWrittenAsOneJsonLine(): void
     {
         $this->log->append(new AuditEntry(new \DateTimeImmutable('2026-11-05T10:00:00+00:00'), '/project', 'rm -rf build', Verdict::AskEveryTime, Outcome::RefusedByUser, ['`rm -rf build`: it deletes recursively']));
