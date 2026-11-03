@@ -10,6 +10,7 @@ namespace App\Connect;
 final readonly class PlannedFile
 {
     /**
+     * @param string|null  $after   null when the file is removed
      * @param list<string> $changes what Airlock changes in it, in words
      * @param list<string> $left    shared settings disconnecting leaves as they are, with no record of the original
      */
@@ -17,7 +18,7 @@ final readonly class PlannedFile
         public string $path,
         public bool $exists,
         public string $before,
-        public string $after,
+        public ?string $after,
         public array $changes,
         public array $left = [],
     ) {
@@ -26,5 +27,10 @@ final readonly class PlannedFile
     public function isChanged(): bool
     {
         return $this->before !== $this->after;
+    }
+
+    public function isRemoved(): bool
+    {
+        return null === $this->after;
     }
 }

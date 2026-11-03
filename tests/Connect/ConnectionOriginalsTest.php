@@ -45,6 +45,19 @@ final class ConnectionOriginalsTest extends TestCase
         $this->originals->keep('/project/.mcp.json', false, '');
 
         self::assertSame('', $this->originals->of('/project/.mcp.json'));
+        self::assertTrue($this->originals->wasAbsent('/project/.mcp.json'));
+    }
+
+    public function testAnEmptyFileIsNotTakenForAnAbsentOne(): void
+    {
+        $this->originals->keep('/project/.mcp.json', true, '');
+
+        self::assertFalse($this->originals->wasAbsent('/project/.mcp.json'));
+    }
+
+    public function testWithoutARecordAFileIsNotKnownToHaveBeenAbsent(): void
+    {
+        self::assertFalse($this->originals->wasAbsent('/project/.mcp.json'));
     }
 
     public function testTheRecordIsReadableByItsOwnerOnly(): void
