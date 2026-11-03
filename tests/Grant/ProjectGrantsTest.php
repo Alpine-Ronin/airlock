@@ -53,6 +53,32 @@ final class ProjectGrantsTest extends TestCase
         self::assertEquals([new Grant(['make', 'test'], true), new Grant(['ls', '-la'], false)], $this->grants()->all());
     }
 
+    public function testTheGrantsFileIsWritableAndReadableByItsOwnerOnly(): void
+    {
+        $this->grants()->add([new Grant(['ls'], false)]);
+
+        $file = $this->configDirectory->forProject($this->project->path).'/grants.yaml';
+        self::assertSame(0o600, fileperms($file) & 0o777, 'Whoever can change it can let any command run without asking.');
+        self::assertSame(0o700, fileperms(\dirname($file)) & 0o777);
+        self::assertSame(0o700, fileperms($this->configDirectory->path) & 0o777);
+    }
+
+    public function testAGrantsFileAnEarlierVersionLeftOpenIsReplacedByAPrivateOne(): void
+    {
+        $this->grants()->add([new Grant(['ls'], false)]);
+        $file = $this->configDirectory->forProject($this->project->path).'/grants.yaml';
+        $this->filesystem->chmod([$file, \dirname($file)], 0o777);
+        $openInode = fileinode($file);
+
+        $this->grants()->add([new Grant(['pwd'], false)]);
+
+        clearstatcache();
+        self::assertSame(0o600, fileperms($file) & 0o777);
+        self::assertSame(0o700, fileperms(\dirname($file)) & 0o777);
+        self::assertNotSame($openInode, fileinode($file), 'A file opened while it was open to others must not see the new grants.');
+        self::assertCount(2, $this->grants()->all());
+    }
+
     public function testAGrantGivenTwiceIsKeptOnce(): void
     {
         $this->grants()->add([new Grant(['make', 'test'], true)]);
