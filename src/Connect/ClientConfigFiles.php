@@ -43,8 +43,25 @@ final readonly class ClientConfigFiles
         }
 
         $after = $exists ? $syntax->disconnect($before, $edit->changes, $original) : $before;
+        if ($exists && $this->holdsOnlyWhatConnectingLeft($edit, $syntax, $after)) {
+            $after = null;
+        }
 
         return new PlannedFile($edit->path, $exists, $before, $after, $changes, $left);
+    }
+
+    /**
+     * A file connecting created, holding nothing but the empty structure disconnecting leaves behind: removing it puts
+     * back what the user had. One they added to since, or one that existed even empty, is theirs and stays.
+     */
+    private function holdsOnlyWhatConnectingLeft(FileEdit $edit, ConfigSyntax $syntax, string $after): bool
+    {
+        if (!$this->originals->wasAbsent($edit->path)) {
+            return false;
+        }
+        $leftByAFreshConnection = $syntax->disconnect($syntax->connect('', $edit->changes), $edit->changes, '');
+
+        return $after === $leftByAFreshConnection;
     }
 
     /**
@@ -69,7 +86,9 @@ final readonly class ClientConfigFiles
 
     private function write(PlannedFile $file, Direction $direction): void
     {
-        if ($file->isChanged()) {
+        if (null === $file->after) {
+            $this->filesystem->remove($file->path);
+        } elseif ($file->isChanged()) {
             if (Direction::Connect === $direction) {
                 $this->originals->keep($file->path, $file->exists, $file->before);
             }

@@ -86,7 +86,44 @@ final class ConnectCommandTest extends KernelTestCase
 
         self::assertSame(Command::SUCCESS, $status);
         self::assertSame(['deny' => ['WebFetch', 'Bash'], 'allow' => []], $this->json(self::PROJECT.'/.claude/settings.local.json')['permissions'] ?? null, 'Bash was denied before Airlock: it stays denied.');
-        self::assertSame(['mcpServers' => []], $this->json(self::PROJECT.'/.mcp.json'));
+        self::assertFileDoesNotExist(self::PROJECT.'/.mcp.json', 'Connecting created it: removing takes it back.');
+    }
+
+    public function testRemovingDeletesTheFilesConnectingCreated(): void
+    {
+        $this->tester()->execute(['client' => 'claude-code']);
+        $tester = $this->tester();
+
+        $status = $tester->execute(['client' => 'claude-code', '--remove' => true]);
+
+        self::assertSame(Command::SUCCESS, $status, $tester->getDisplay());
+        self::assertFileDoesNotExist(self::PROJECT.'/.mcp.json');
+        self::assertFileDoesNotExist(self::PROJECT.'/.claude/settings.local.json');
+        self::assertStringContainsString('.mcp.json (removed)', $tester->getDisplay());
+    }
+
+    public function testRemovingKeepsAFileConnectingCreatedOnceTheUserAddedToIt(): void
+    {
+        $this->tester()->execute(['client' => 'claude-code']);
+        $servers = ['mcpServers' => [
+            'airlock' => RecordedResponses::at($this->json(self::PROJECT.'/.mcp.json'), 'mcpServers', 'airlock'),
+            'other' => ['type' => 'stdio', 'command' => 'other'],
+        ]];
+        $this->filesystem->dumpFile(self::PROJECT.'/.mcp.json', json_encode($servers, \JSON_THROW_ON_ERROR));
+
+        $this->tester()->execute(['client' => 'claude-code', '--remove' => true]);
+
+        self::assertSame(['mcpServers' => ['other' => ['type' => 'stdio', 'command' => 'other']]], $this->json(self::PROJECT.'/.mcp.json'));
+    }
+
+    public function testRemovingKeepsAnEmptyFileThatExistedBefore(): void
+    {
+        $this->filesystem->dumpFile(self::PROJECT.'/.mcp.json', '');
+        $this->tester()->execute(['client' => 'claude-code']);
+
+        $this->tester()->execute(['client' => 'claude-code', '--remove' => true]);
+
+        self::assertFileExists(self::PROJECT.'/.mcp.json', 'The user had this file, empty as it was.');
     }
 
     public function testWithoutARecordOfTheOriginalSharedSettingsAreLeftAndSaidSo(): void

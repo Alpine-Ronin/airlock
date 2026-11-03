@@ -211,9 +211,18 @@ final class ConnectCommand extends Command
     private function show(SymfonyStyle $io, array $files): void
     {
         foreach ($files as $file) {
-            $io->text($file->path.($file->exists ? '' : ' (new file)'));
+            $io->text($file->path.$this->fileLabel($file));
             $io->listing($file->changes);
         }
+    }
+
+    private function fileLabel(PlannedFile $file): string
+    {
+        if ($file->isRemoved()) {
+            return ' (removed)';
+        }
+
+        return $file->exists ? '' : ' (new file)';
     }
 
     private function showOtherClients(SymfonyStyle $io): int

@@ -49,6 +49,26 @@ final readonly class ConnectionOriginals
      */
     public function of(string $path): ?string
     {
+        $kept = $this->record($path);
+
+        return \is_string($kept['content'] ?? null) ? $kept['content'] : null;
+    }
+
+    /**
+     * Whether the record says the file did not exist before Airlock first changed it: false without a record.
+     */
+    public function wasAbsent(string $path): bool
+    {
+        $kept = $this->record($path);
+
+        return false === ($kept['existed'] ?? null);
+    }
+
+    /**
+     * @return array<mixed>|null
+     */
+    private function record(string $path): ?array
+    {
         $record = $this->recordPath($path);
         if (!is_file($record) || !is_readable($record)) {
             return null;
@@ -64,7 +84,7 @@ final readonly class ConnectionOriginals
             return null;
         }
 
-        return \is_array($kept) && \is_string($kept['content'] ?? null) ? $kept['content'] : null;
+        return \is_array($kept) ? $kept : null;
     }
 
     public function forget(string $path): void
