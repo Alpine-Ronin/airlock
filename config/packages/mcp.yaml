@@ -1,6 +1,8 @@
 mcp:
     servers:
         default:
+            name: airlock
+            version: '%airlock.version%'
             registry: 'App\Mcp\'
 
             # Clients start Airlock as a process; a tool that runs commands has no business on an HTTP endpoint.
