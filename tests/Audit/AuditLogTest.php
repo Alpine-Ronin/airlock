@@ -18,6 +18,8 @@ final class AuditLogTest extends TestCase
 {
     private const string HOME = __DIR__.'/../../var/test-audit';
 
+    private const string LOG = self::HOME.'/.config/airlock/audit.jsonl';
+
     private AuditLog $log;
 
     #[\Override]
@@ -36,6 +38,64 @@ final class AuditLogTest extends TestCase
     public function testAnEmptyLogHasNoEntries(): void
     {
         self::assertSame([], $this->log->lastEntriesFor('/project', 10));
+    }
+
+    public function testTheLogIsReadableByItsOwnerOnly(): void
+    {
+        $this->log->append($this->entry('/project', 'ls'));
+
+        self::assertSame(0o600, fileperms(self::LOG) & 0o777, 'The log holds every command run in every project.');
+    }
+
+    public function testItsDirectoryIsClosedToOthersBeforeTheLogIsMade(): void
+    {
+        new Filesystem()->mkdir(\dirname(self::LOG), 0o755);
+        new Filesystem()->chmod(\dirname(self::LOG), 0o755);
+
+        $this->log->append($this->entry('/project', 'ls'));
+
+        self::assertSame(0o700, fileperms(\dirname(self::LOG)) & 0o777, 'Nobody else can open the log, even for the moment it is being made.');
+    }
+
+    public function testALogAnEarlierVersionLeftOpenIsReplacedByAPrivateCopy(): void
+    {
+        $earlier = $this->entry('/project', 'earlier');
+        new Filesystem()->dumpFile(self::LOG, json_encode($earlier->toArray(), \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES)."\n");
+        new Filesystem()->chmod(self::LOG, 0o644);
+        $openInode = fileinode(self::LOG);
+
+        $this->log->append($this->entry('/project', 'later'));
+
+        clearstatcache();
+        self::assertSame(0o600, fileperms(self::LOG) & 0o777);
+        self::assertNotSame($openInode, fileinode(self::LOG), 'A file opened while the log was readable by others must not see the later entries.');
+        self::assertCount(2, $this->log->lastEntriesFor('/project', 10), 'The earlier entries are kept.');
+    }
+
+    public function testALogLeftOpenIsReplacedWithoutBeingLoadedInMemory(): void
+    {
+        $line = str_repeat('x', 1023)."\n";
+        new Filesystem()->dumpFile(self::LOG, '');
+        new Filesystem()->chmod(self::LOG, 0o644);
+        $handle = fopen(self::LOG, 'a');
+        self::assertIsResource($handle);
+        for ($kibibyte = 0; $kibibyte < 32 * 1024; ++$kibibyte) {
+            fwrite($handle, $line);
+        }
+        fclose($handle);
+        $memoryLimit = \ini_get('memory_limit');
+
+        ini_set('memory_limit', (string) (memory_get_usage() + 16 * 1024 * 1024));
+        try {
+            $this->log->append($this->entry('/project', 'ls'));
+        } finally {
+            ini_set('memory_limit', $memoryLimit);
+        }
+
+        clearstatcache();
+        $earlierEntries = 32 * 1024 * 1024;
+        $newEntry = json_encode($this->entry('/project', 'ls')->toArray(), \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES)."\n";
+        self::assertSame($earlierEntries + \strlen($newEntry), filesize(self::LOG), 'The whole log was copied, then the entry appended.');
     }
 
     public function testAnEntryIsWrittenAsOneJsonLine(): void
