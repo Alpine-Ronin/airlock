@@ -159,6 +159,19 @@ final class AuditLogTest extends TestCase
         self::assertSame(['b', 'c'], $this->commandsOf($lastEntries));
     }
 
+    public function testEntriesAcrossEveryChunkBoundaryComeBackWholeAndInOrder(): void
+    {
+        $commands = [];
+        for ($entry = 0; $entry < 400; ++$entry) {
+            $commands[] = \sprintf('%d %s', $entry, str_repeat('z', ($entry * 997) % 3000));
+        }
+        foreach ($commands as $command) {
+            $this->log->append($this->entry('/project', $command));
+        }
+
+        self::assertSame($commands, $this->commandsOf($this->log->lastEntriesFor('/project', 400)));
+    }
+
     public function testAskingForNoEntriesReadsNothing(): void
     {
         $this->log->append($this->entry('/project', 'a'));
@@ -179,14 +192,15 @@ final class AuditLogTest extends TestCase
     /**
      * @param list<string> $lines
      *
-     * @return list<mixed>
+     * @return list<string|null>
      */
     private function commandsOf(array $lines): array
     {
         $commands = [];
         foreach ($lines as $line) {
             $entry = json_decode($line, true);
-            $commands[] = \is_array($entry) ? $entry['command'] ?? null : null;
+            $command = \is_array($entry) ? $entry['command'] ?? null : null;
+            $commands[] = \is_string($command) ? $command : null;
         }
 
         return $commands;

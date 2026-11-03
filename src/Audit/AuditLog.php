@@ -63,7 +63,8 @@ final readonly class AuditLog
 
     /**
      * The log's lines from its end, read a chunk at a time: the log only grows, and holding all of it in memory
-     * would fail once it outgrows the memory limit.
+     * would fail once it outgrows the memory limit. The pieces of a line longer than a chunk are joined once it is
+     * complete, not at every chunk, which would copy a long line over and over.
      *
      * @return \Generator<int, string>
      */
@@ -77,7 +78,7 @@ final readonly class AuditLog
         try {
             fseek($handle, 0, \SEEK_END);
             $position = (int) ftell($handle);
-            $lineStart = '';
+            $unfinishedLine = [];
             while ($position > 0) {
                 $length = min(self::CHUNK, $position);
                 $position -= $length;
@@ -87,19 +88,31 @@ final readonly class AuditLog
                     throw new \RuntimeException(\sprintf('Airlock cannot read %s.', $file));
                 }
 
-                $lines = explode("\n", $chunk.$lineStart);
-                $lineStart = array_shift($lines);
-                foreach (array_reverse($lines) as $line) {
-                    if ('' !== $line) {
-                        yield $line;
-                    }
+                $parts = explode("\n", $chunk);
+                $unfinishedLine[] = array_pop($parts);
+                if ([] === $parts) {
+                    continue;
+                }
+
+                yield from $this->unlessEmpty(implode('', array_reverse($unfinishedLine)));
+                $unfinishedLine = [array_shift($parts)];
+                foreach (array_reverse($parts) as $line) {
+                    yield from $this->unlessEmpty($line);
                 }
             }
-            if ('' !== $lineStart) {
-                yield $lineStart;
-            }
+            yield from $this->unlessEmpty(implode('', array_reverse($unfinishedLine)));
         } finally {
             fclose($handle);
+        }
+    }
+
+    /**
+     * @return \Generator<int, string>
+     */
+    private function unlessEmpty(string $line): \Generator
+    {
+        if ('' !== $line) {
+            yield $line;
         }
     }
 
