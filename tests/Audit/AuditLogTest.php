@@ -142,6 +142,30 @@ final class AuditLogTest extends TestCase
         self::assertSame(['b', 'c'], $this->commandsOf($lastEntries));
     }
 
+    public function testAHugeEntryBeforeTheOnesAskedForIsNotRead(): void
+    {
+        $this->log->append($this->entry('/other', str_repeat('x', 32 * 1024 * 1024)));
+        $this->log->append($this->entry('/project', 'b'));
+        $this->log->append($this->entry('/project', 'c'));
+        $memoryLimit = \ini_get('memory_limit');
+
+        ini_set('memory_limit', (string) (memory_get_usage() + 16 * 1024 * 1024));
+        try {
+            $lastEntries = $this->log->lastEntriesFor('/project', 2);
+        } finally {
+            ini_set('memory_limit', $memoryLimit);
+        }
+
+        self::assertSame(['b', 'c'], $this->commandsOf($lastEntries));
+    }
+
+    public function testAskingForNoEntriesReadsNothing(): void
+    {
+        $this->log->append($this->entry('/project', 'a'));
+
+        self::assertSame([], $this->log->lastEntriesFor('/project', 0));
+    }
+
     public function testAnEntryLongerThanWhatIsReadAtOnceComesBackWhole(): void
     {
         $longCommand = 'echo '.str_repeat('y', 300 * 1024);

@@ -42,18 +42,19 @@ final readonly class AuditLog
     public function lastEntriesFor(string $project, int $count): array
     {
         $file = $this->file();
-        if (!is_file($file)) {
+        if ($count <= 0 || !is_file($file)) {
             return [];
         }
 
         $newestFirst = [];
         foreach ($this->linesNewestFirst($file) as $line) {
-            if (\count($newestFirst) >= $count) {
-                break;
-            }
             $entry = json_decode($line, true);
-            if (\is_array($entry) && ($entry['project'] ?? null) === $project) {
-                $newestFirst[] = $line;
+            if (!\is_array($entry) || ($entry['project'] ?? null) !== $project) {
+                continue;
+            }
+            $newestFirst[] = $line;
+            if (\count($newestFirst) === $count) {
+                break;
             }
         }
 
