@@ -47,14 +47,29 @@ final class AuditLogTest extends TestCase
         self::assertSame(0o600, fileperms(self::LOG) & 0o777, 'The log holds every command run in every project.');
     }
 
-    public function testALogAnEarlierVersionLeftOpenIsClosed(): void
+    public function testItsDirectoryIsClosedToOthersBeforeTheLogIsMade(): void
     {
-        new Filesystem()->dumpFile(self::LOG, '');
-        new Filesystem()->chmod(self::LOG, 0o644);
+        new Filesystem()->mkdir(\dirname(self::LOG), 0o755);
+        new Filesystem()->chmod(\dirname(self::LOG), 0o755);
 
         $this->log->append($this->entry('/project', 'ls'));
 
+        self::assertSame(0o700, fileperms(\dirname(self::LOG)) & 0o777, 'Nobody else can open the log, even for the moment it is being made.');
+    }
+
+    public function testALogAnEarlierVersionLeftOpenIsReplacedByAPrivateCopy(): void
+    {
+        $earlier = $this->entry('/project', 'earlier');
+        new Filesystem()->dumpFile(self::LOG, json_encode($earlier->toArray(), \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES)."\n");
+        new Filesystem()->chmod(self::LOG, 0o644);
+        $openInode = fileinode(self::LOG);
+
+        $this->log->append($this->entry('/project', 'later'));
+
+        clearstatcache();
         self::assertSame(0o600, fileperms(self::LOG) & 0o777);
+        self::assertNotSame($openInode, fileinode(self::LOG), 'A file opened while the log was readable by others must not see the later entries.');
+        self::assertCount(2, $this->log->lastEntriesFor('/project', 10), 'The earlier entries are kept.');
     }
 
     public function testAnEntryIsWrittenAsOneJsonLine(): void

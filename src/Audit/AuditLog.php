@@ -61,16 +61,39 @@ final readonly class AuditLog
     }
 
     /**
-     * The log names every command run in every project: readable by its owner only, before its first entry and also
-     * when an earlier version created it open.
+     * The log names every command run in every project: nobody else may open it, not even while it is being made,
+     * which its directory ensures. A log an earlier version left open is replaced rather than closed: chmod does not
+     * take back a file someone else opened in the meantime.
      */
     private function closeToOthers(): void
     {
+        $this->filesystem->mkdir($this->configDirectory->path, 0o700);
+        $this->filesystem->chmod($this->configDirectory->path, 0o700);
+
         $file = $this->file();
+        clearstatcache(true, $file);
         if (!is_file($file)) {
             $this->filesystem->dumpFile($file, '');
+            $this->filesystem->chmod($file, 0o600);
+
+            return;
         }
-        $this->filesystem->chmod($file, 0o600);
+        $mode = fileperms($file);
+        if (false === $mode || 0o600 !== ($mode & 0o777)) {
+            $this->replaceWithPrivateCopy($file);
+        }
+    }
+
+    private function replaceWithPrivateCopy(string $file): void
+    {
+        $copy = $this->filesystem->tempnam(\dirname($file), '.audit-');
+        try {
+            $this->filesystem->chmod($copy, 0o600);
+            $this->filesystem->appendToFile($copy, $this->filesystem->readFile($file));
+            $this->filesystem->rename($copy, $file, true);
+        } finally {
+            $this->filesystem->remove($copy);
+        }
     }
 
     private function file(): string
