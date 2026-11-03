@@ -19,6 +19,8 @@ permissions:
 
 env:
     PHP_VERSION: '8.5'
+    # static-php-cli builds the runtime: a pinned release, so that a new one cannot break a release build unannounced.
+    SPC_VERSION: '2.8.5'
     PHP_EXTENSIONS: 'ctype,curl,dom,fileinfo,filter,iconv,mbstring,openssl,pcntl,phar,posix,session,tokenizer,xml,zlib'
 
 jobs:
@@ -67,7 +69,7 @@ jobs:
             - name: Name the runtime by its PHP version and extensions
               id: runtime-key
               shell: bash
-              run: echo "key=micro-${{ matrix.target }}-php${{ env.PHP_VERSION }}-$(printf '%s' "$PHP_EXTENSIONS" | shasum -a 256 | cut -c1-16)" >> "$GITHUB_OUTPUT"
+              run: echo "key=micro-${{ matrix.target }}-php${{ env.PHP_VERSION }}-spc${{ env.SPC_VERSION }}-$(printf '%s' "$PHP_EXTENSIONS" | shasum -a 256 | cut -c1-16)" >> "$GITHUB_OUTPUT"
 
             - name: Restore the static PHP runtime
               id: runtime
@@ -85,7 +87,7 @@ jobs:
                   MUSL_ARCHIVE_URL: https://deb.debian.org/debian/pool/main/m/musl/musl_1.2.5.orig.tar.gz
                   MUSL_ARCHIVE_SHA256: a9a118bbe84d8764da0ea0d28b3ab3fae8477fc7e4085d90102b8596fc7c75e4
               run: |
-                  curl -fsSL -o spc.tgz "https://github.com/crazywhalecc/static-php-cli/releases/latest/download/spc-${{ matrix.target }}.tar.gz"
+                  curl -fsSL -o spc.tgz "https://github.com/crazywhalecc/static-php-cli/releases/download/${{ env.SPC_VERSION }}/spc-${{ matrix.target }}.tar.gz"
                   tar -xzf spc.tgz
                   if [ "$RUNNER_OS" = Linux ]; then
                       curl -fsSL --connect-timeout 20 --max-time 120 --retry 3 --retry-all-errors -o "$RUNNER_TEMP/musl-1.2.5.tar.gz" "$MUSL_ARCHIVE_URL"
