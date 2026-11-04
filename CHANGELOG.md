@@ -1,0 +1,94 @@
+# Changelog
+
+What changed in each release, newest first. Versions follow [semantic versioning](https://semver.org): until 1.0, a
+minor version may change the configuration and file formats.
+
+## Unreleased
+
+### Added
+
+- `airlock grants` lists the commands allowed always in the project, and `--revoke` takes them back (#33).
+- `airlock log` shows the project's last decisions in plain words (#33).
+
+### Security
+
+- Commands shown by `airlock grants` and `airlock log` cannot write terminal escape sequences or console tags (#33).
+
+## 0.2.6 (2026-11-04)
+
+### Fixed
+
+- `airlock connect goose`, on a Goose that had not started yet, left its developer extension's shell tool on: the
+  agent could run commands around Airlock. It now writes that extension without it (#31).
+
+### Changed
+
+- The README says how each client was tested and what to expect in it (#32).
+
+## 0.2.5 (2026-11-03)
+
+### Fixed
+
+- `airlock connect --remove` also removes the directories connecting created, once empty (#29).
+
+### Security
+
+- The grants file is written readable by its owner only, as a new file each time (#29).
+- Release builds check static-php-cli's archive against a pinned SHA-256 (#29).
+
+## 0.2.4 (2026-11-03)
+
+### Fixed
+
+- Release builds fetch musl from Debian's mirror, pinned by hash: musl.libc.org was unreachable (#28).
+
+## 0.2.3 (2026-11-03, not published)
+
+Its release build failed; 0.2.4 holds the same changes.
+
+### Added
+
+- `airlock --version`, and the server reports its name and version to the client (#24, #26).
+
+### Fixed
+
+- `airlock connect --remove` deletes the files connecting created (#23).
+- Reading the audit log's last entries reads it from its end, instead of loading it whole (#27).
+- The README clones the repository for the demo when Airlock was installed as a binary (#22).
+
+### Security
+
+- The audit log and its directory are readable by their owner only, and a log an earlier version left open is
+  replaced (#25).
+
+## 0.2.2 (2026-11-01)
+
+### Fixed
+
+- `airlock connect` keeps each file as it was before Airlock first changed it, and writes nothing over a file that
+  changed while it asked (#19).
+
+## 0.2.1 (2026-11-01)
+
+### Added
+
+- `airlock connect` for Claude Code, Codex, Cursor, VS Code and Goose (#18).
+
+## 0.2.0 (2026-11-01)
+
+### Added
+
+- `airlock configure` finds and calibrates the models, with the key typed in a terminal, never through the agent
+  (#17).
+- The logo, and documentation for any MCP client (#12, #13, #14).
+
+### Security
+
+- The committed development `APP_SECRET` is removed (#15).
+
+## 0.1.0 (2026-10-31)
+
+The first release: the shell parser, the policy, bubblewrap and `sandbox-exec` sandboxes, the `run_command` tool,
+the form with once, this session, always or refuse, signed state, grants, the audit log, the model checks of
+outputs and commands through any OpenAI-compatible API, and standalone binaries for Linux and macOS, with an
+installer (#1 to #11).
