@@ -31,10 +31,11 @@ final class ShellParserFuzzTest extends TestCase
 
     /**
      * bash runs this handler for every program it cannot find, and none can be found, builtins turned off but the
-     * handler's own: it writes the words it was given, in one write so that commands running at once do not mix theirs.
+     * handler's own: it writes the words it was given, in one write so that commands running at once do not mix theirs,
+     * and exits with the status the run gives every command, so that each run takes one branch of `&&` and `||`.
      */
     private const string RECORDER = <<<'BASH'
-        command_not_found_handle() { local record; printf -v record '%s\037' "$@"; printf '%s\036' "$record" >> "$AIRLOCK_FUZZ_LOG"; return 0; }
+        command_not_found_handle() { local record; printf -v record '%s\037' "$@"; printf '%s\036' "$record" >> "$AIRLOCK_FUZZ_LOG"; return "$AIRLOCK_FUZZ_STATUS"; }
         PATH=/nonexistent
         for builtin in $(compgen -b); do case $builtin in enable|local|printf|return) ;; *) enable -n "$builtin" ;; esac; done
         BASH;
@@ -94,7 +95,7 @@ final class ShellParserFuzzTest extends TestCase
             }
             $read = array_map(static fn (SimpleCommand $command): array => $command->programWords(), $parsed->commands);
 
-            foreach ($this->commandsBashRuns($line) as $ran) {
+            foreach ([...$this->commandsBashRuns($line, status: 0), ...$this->commandsBashRuns($line, status: 1)] as $ran) {
                 self::assertContains($ran, $read, \sprintf('bash runs %s, which the parser did not read in the line %s (seed %d). It read: %s', json_encode($ran), json_encode($line), $seed, json_encode($read)));
             }
         }
@@ -112,6 +113,14 @@ final class ShellParserFuzzTest extends TestCase
     private static function isBareBrace(Token $token): bool
     {
         return '{' === $token->text && !$token->isQuoted();
+    }
+
+    public function testEachBranchOfAConditionRunsOnce(): void
+    {
+        $line = "test '' && rm a || rm b";
+
+        self::assertSame([['test', ''], ['rm', 'a']], $this->commandsBashRuns($line, status: 0));
+        self::assertSame([['test', ''], ['rm', 'b']], $this->commandsBashRuns($line, status: 1), 'The commands after a failing one are compared too.');
     }
 
     private function randomLine(Randomizer $randomizer): string
@@ -135,12 +144,12 @@ final class ShellParserFuzzTest extends TestCase
     /**
      * @return list<list<string>>
      */
-    private function commandsBashRuns(string $line): array
+    private function commandsBashRuns(string $line, int $status): array
     {
         $this->filesystem->remove(self::DIRECTORY);
         $log = self::DIRECTORY.'/commands.log';
         $this->filesystem->dumpFile($log, '');
-        $process = new Process(['bash', '-c', self::RECORDER."\n".$line], self::DIRECTORY, ['AIRLOCK_FUZZ_LOG' => $log], timeout: 10);
+        $process = new Process(['bash', '-c', self::RECORDER."\n".$line], self::DIRECTORY, ['AIRLOCK_FUZZ_LOG' => $log, 'AIRLOCK_FUZZ_STATUS' => (string) $status], timeout: 10);
         $process->run();
 
         $commands = [];
