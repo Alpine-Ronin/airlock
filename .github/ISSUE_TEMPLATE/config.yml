@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a vulnerability
+    url: https://github.com/hbenabdallah/airlock/security/advisories/new
+    about: 'A way around Airlock, privately. Never in an issue.'
