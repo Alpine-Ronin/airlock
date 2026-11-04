@@ -151,7 +151,6 @@ Next, in this order:
   comments are read without asking, but come back as an output does: checked
   for injection, marked as data, secrets masked. Only GitHub, only these
   actions: any other service keeps the rule that its commands are the user's.
-- Releases that prove where they come from (build provenance, an SBOM, a
-  signed and notarized macOS binary) and a parser fuzzed against grants that
-  cover more than they say.
+- Releases that prove where they come from: build provenance, an SBOM, a
+  signed and notarized macOS binary.
 - 1.0: the policy, grants and audit formats documented and kept stable.
