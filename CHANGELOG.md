@@ -3,7 +3,7 @@
 What changed in each release, newest first. Versions follow [semantic versioning](https://semver.org): until 1.0, a
 minor version may change the configuration and file formats.
 
-## Unreleased
+## 0.3.1 (2026-11-04)
 
 ### Fixed
 
