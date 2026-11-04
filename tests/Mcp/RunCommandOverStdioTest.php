@@ -218,6 +218,18 @@ final class RunCommandOverStdioTest extends TestCase
         self::assertFileExists(new ConfigDirectory($this->home)->forProject($this->project).'/grants.yaml');
     }
 
+    public function testWithoutASandboxAGrantForThisProjectRunsNothingWithoutAsking(): void
+    {
+        $client = $this->client(['AIRLOCK_SANDBOX' => 'off']);
+        $client->request($this->modernCall(2, self::COMMAND, 'always', $this->askState($client, self::COMMAND)));
+
+        $answer = $this->client(['AIRLOCK_SANDBOX' => 'off'])->request($this->modernCall(1, self::COMMAND));
+
+        self::assertFileExists(new ConfigDirectory($this->home)->forProject($this->project).'/grants.yaml');
+        self::assertSame('input_required', $this->field($answer, 'result', 'resultType'), 'Without a sandbox the command would run with all the user\'s permissions: it is asked, grant or not.');
+        self::assertSame("ran\n", $this->filesystem->readFile($this->project.'/runs.txt'), 'Only the approved run happened.');
+    }
+
     public function testAGrantDoesNotCoverAChainedCommand(): void
     {
         $client = $this->client();

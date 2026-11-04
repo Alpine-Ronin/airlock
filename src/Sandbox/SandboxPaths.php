@@ -96,6 +96,61 @@ final readonly class SandboxPaths
     }
 
     /**
+     * The first key store, Airlock directory or Airlock installation the project overlaps, existing or not, or null
+     * when it overlaps none. A sandbox lets a command write anywhere in the project, so it cannot keep these out of
+     * reach there: a command could create a missing `~/.ssh/config` or Airlock's `.env.local`, change Airlock's own
+     * code, or rename the directory above a hidden one and write in it. A project inside a key store or Airlock's
+     * directory would be hidden from its own commands.
+     */
+    public function overlappedBy(string $projectDirectory): ?string
+    {
+        // Airlock's installation is not hidden, only its secrets: a project inside it is fine.
+        $installation = $this->resolved($this->airlockDirectory);
+        if ($this->isWithin($installation, $projectDirectory)) {
+            return $installation;
+        }
+        $hiddenWhole = [$this->resolved($this->configDirectory->path)];
+        $home = $this->resolved($this->home);
+        foreach (self::KEYS as $key) {
+            $hiddenWhole[] = $this->resolved($home.'/'.$key);
+        }
+        foreach ($hiddenWhole as $hidden) {
+            if ($this->isWithin($hidden, $projectDirectory) || $this->isWithin($projectDirectory, $hidden)) {
+                return $hidden;
+            }
+        }
+
+        return null;
+    }
+
+    private function resolved(string $path): string
+    {
+        $real = realpath($path);
+
+        return false === $real ? $path : $real;
+    }
+
+    private function isWithin(string $path, string $directory): bool
+    {
+        return $path === $directory || str_starts_with($path, rtrim($directory, '/').'/');
+    }
+
+    /**
+     * The user's known hosts, for a command lent the SSH agent: without them ssh cannot tell the real server from
+     * one pretending to be it, and refuses to connect. They hold servers' public keys, nothing secret, and stay
+     * read-only so that a command cannot vouch for a forged one. Null when there are none.
+     */
+    public function knownHosts(): ?string
+    {
+        $sshDirectory = realpath($this->home.'/.ssh');
+        if (false === $sshDirectory || !is_file($sshDirectory.'/known_hosts')) {
+            return null;
+        }
+
+        return $sshDirectory.'/known_hosts';
+    }
+
+    /**
      * Paths of the project a command may read but not change. In a git repository, those git would otherwise create
      * are made first, empty, as `git init` makes them: a path that does not exist cannot be kept read-only, and a
      * command could plant it.

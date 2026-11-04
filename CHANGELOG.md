@@ -9,7 +9,21 @@ minor version may change the configuration and file formats.
 
 - `airlock doctor` said a client was connected to no Airlock when it starts another one, such as an earlier install,
   and said nothing when the client starts this Airlock with its own shell tool back on: it now names both, the second
-  as a problem.
+  as a problem (#38).
+- A command lent the SSH agent, such as `git push` over SSH, could not check the server's host key, so ssh refused to
+  connect: it now reads `~/.ssh/known_hosts`, read-only. The keys and the rest of `~/.ssh` stay hidden (#39).
+
+### Security
+
+- On macOS, a command run with a project that holds the user's keys or Airlock's own files, such as the home directory,
+  could write to them: they were hidden from reading only. They are now out of reach for writing too, as on Linux
+  (#39).
+- A project that holds the home directory, Airlock's directory or Airlock's installation, or that sits inside a key
+  store or Airlock's directory, now runs without a sandbox, so that every command is asked: there, a command could
+  create a missing `~/.ssh/config` or Airlock's `.env.local`, change Airlock's own code, or rename the directory above
+  a hidden one, on Linux and macOS alike. `airlock doctor` and the form say so (#39).
+- Without a sandbox, a command covered by a grant ran without asking, with all the user's permissions. Every command
+  is now asked when there is no sandbox, as the documentation said (#39).
 
 ## 0.3.0 (2026-11-04)
 

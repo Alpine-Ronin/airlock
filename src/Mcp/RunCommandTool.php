@@ -23,6 +23,8 @@ use App\Policy\InvalidPolicyException;
 use App\Policy\PolicyFiles;
 use App\Policy\Verdict;
 use App\Risk\RiskExplainer;
+use App\Sandbox\NoSandbox;
+use App\Sandbox\SandboxDetector;
 use App\Shell\CommandLine;
 use App\Shell\ShellParser;
 use Mcp\Capability\Attribute\McpTool;
@@ -56,6 +58,7 @@ final readonly class RunCommandTool
         private RiskExplainer $riskExplainer,
         private Approvals $approvals,
         private CommandRunner $runner,
+        private SandboxDetector $sandboxDetector,
         private InjectionClassifier $injectionClassifier,
         private OutputReport $outputReport,
         private AuditLog $auditLog,
@@ -76,7 +79,8 @@ final readonly class RunCommandTool
         $line = $this->parser->parse($command);
         try {
             $assessment = $this->policy->assess($line, $this->policyFiles->refusals());
-            $isCovered = Verdict::Plain === $assessment->verdict && $this->grants->covers($line);
+            // A grant was given for a command that stays in the sandbox: without one, every command is asked.
+            $isCovered = Verdict::Plain === $assessment->verdict && !$this->sandboxDetector->detect() instanceof NoSandbox && $this->grants->covers($line);
         } catch (InvalidPolicyException|InvalidGrantsException $e) {
             $this->audit($command, new Assessment(Verdict::Refused), Outcome::Failed, detail: $e->getMessage());
 

@@ -59,7 +59,7 @@ final readonly class ApprovalForm
             $this->sandboxDetector->detect()->describe(),
         ];
         if ($assessment->needsSshAgent) {
-            $paragraphs[] = 'If you allow it, it can use your SSH agent: it talks to another machine.';
+            $paragraphs[] = 'If you allow it, it can use your SSH agent and read your known hosts: it talks to another machine.';
         }
         if (\in_array(Decision::Always, $decisions, true) && [] !== $grants) {
             $paragraphs[] = 'For this session or always, it allows: '.implode(', ', array_map(static fn (Grant $grant): string => '`'.$grant->describe().'`', $grants));

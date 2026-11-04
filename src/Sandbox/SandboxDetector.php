@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Sandbox;
 
+use App\Execution\ProjectDirectory;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Process\Exception\ExceptionInterface as ProcessException;
 use Symfony\Component\Process\ExecutableFinder;
@@ -18,6 +19,7 @@ final class SandboxDetector
 
     public function __construct(
         private readonly SandboxPaths $paths,
+        private readonly ProjectDirectory $projectDirectory,
         #[Autowire(env: 'enum:App\Sandbox\SandboxMode:AIRLOCK_SANDBOX')]
         private readonly SandboxMode $mode,
         private readonly ExecutableFinder $executableFinder = new ExecutableFinder(),
@@ -34,6 +36,10 @@ final class SandboxDetector
     {
         if (SandboxMode::Off === $this->mode) {
             return new NoSandbox('turned off with AIRLOCK_SANDBOX=off');
+        }
+        $overlapped = $this->paths->overlappedBy($this->projectDirectory->path);
+        if (null !== $overlapped) {
+            return new NoSandbox(\sprintf('the project overlaps %s, which no sandbox can then keep a command from changing; open a project apart from it', $overlapped));
         }
         $cutsNetwork = SandboxMode::Strict === $this->mode;
 
