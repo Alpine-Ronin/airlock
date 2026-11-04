@@ -125,7 +125,7 @@ final class DoctorCommandTest extends KernelTestCase
         $tester = $this->tester();
 
         self::assertSame(Command::FAILURE, $tester->execute([]));
-        self::assertStringContainsString(\sprintf('Others can open %s/models.yaml. Close them with: chmod -R go= %s', self::AIRLOCK, self::AIRLOCK), $this->display($tester));
+        self::assertStringContainsString(\sprintf("Others can open %s/models.yaml. Close them with: chmod -R go= '%s'", self::AIRLOCK, self::AIRLOCK), $this->display($tester));
     }
 
     public function testFilesOpenToTheirOwnerOnlyAreFine(): void
@@ -137,6 +137,40 @@ final class DoctorCommandTest extends KernelTestCase
 
         self::assertSame(Command::SUCCESS, $tester->execute([]));
         self::assertStringContainsString('is open to you only', $this->display($tester));
+    }
+
+    public function testADirectoryThatCannotBeReadIsAProblem(): void
+    {
+        $this->filesystem->mkdir(self::AIRLOCK.'/projects', 0o700);
+        $this->filesystem->chmod(self::AIRLOCK, 0o700);
+        $this->filesystem->chmod(self::AIRLOCK.'/projects', 0o000);
+        $tester = $this->tester();
+
+        try {
+            $status = $tester->execute([]);
+        } finally {
+            $this->filesystem->chmod(self::AIRLOCK.'/projects', 0o700);
+        }
+
+        self::assertSame(Command::FAILURE, $status);
+        self::assertStringContainsString(\sprintf("Airlock's files: Airlock cannot read all of %s", self::AIRLOCK), $this->display($tester));
+        self::assertStringContainsString('Clients:', $this->display($tester), 'The other checks still run.');
+    }
+
+    public function testAClientFileThatCannotBeReadLeavesThatClientOut(): void
+    {
+        $this->filesystem->dumpFile(self::PROJECT.'/.mcp.json', '{}');
+        $this->filesystem->chmod(self::PROJECT.'/.mcp.json', 0o000);
+        $tester = $this->tester();
+
+        try {
+            $status = $tester->execute([]);
+        } finally {
+            $this->filesystem->chmod(self::PROJECT.'/.mcp.json', 0o600);
+        }
+
+        self::assertSame(Command::SUCCESS, $status, $tester->getDisplay());
+        self::assertStringContainsString('Airlock is connected to none of', $this->display($tester));
     }
 
     public function testAConnectedClientIsNamed(): void

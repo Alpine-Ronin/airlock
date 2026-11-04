@@ -31,7 +31,11 @@ final readonly class PrivateFilesCheck implements Check
             return Finding::ok(self::TOPIC, \sprintf('%s does not exist yet: Airlock creates it, open to you only, when it first writes there.', $directory));
         }
 
-        $open = $this->openToOthers($directory);
+        try {
+            $open = $this->openToOthers($directory);
+        } catch (\UnexpectedValueException) {
+            return Finding::problem(self::TOPIC, \sprintf('Airlock cannot read all of %s: it, and everything in it, should be yours. Check with: ls -laR %s', $directory, escapeshellarg($directory)));
+        }
         if ([] === $open) {
             return Finding::ok(self::TOPIC, \sprintf('%s is open to you only.', $directory));
         }
@@ -39,7 +43,7 @@ final readonly class PrivateFilesCheck implements Check
         $shown = implode(', ', \array_slice($open, 0, self::SHOWN));
         $more = \count($open) > self::SHOWN ? \sprintf(' and %d more', \count($open) - self::SHOWN) : '';
 
-        return Finding::problem(self::TOPIC, \sprintf('Others can open %s%s. Close them with: chmod -R go= %s', $shown, $more, $directory));
+        return Finding::problem(self::TOPIC, \sprintf('Others can open %s%s. Close them with: chmod -R go= %s', $shown, $more, escapeshellarg($directory)));
     }
 
     /**
