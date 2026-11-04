@@ -59,6 +59,8 @@ final readonly class ModelSettingsFile
     public function write(ModelSettings $settings): void
     {
         $path = $this->path();
+        $this->filesystem->mkdir($this->configDirectory->path, 0o700);
+        $this->filesystem->chmod($this->configDirectory->path, 0o700);
         if (!is_file($path)) {
             $this->filesystem->dumpFile($path, '');
         }

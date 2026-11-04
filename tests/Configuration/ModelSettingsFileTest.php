@@ -55,6 +55,13 @@ final class ModelSettingsFileTest extends TestCase
         self::assertSame(0o600, fileperms($this->file->path()) & 0o777);
     }
 
+    public function testAirlocksDirectoryIsCreatedOpenToItsOwnerOnly(): void
+    {
+        $this->file->write(new ModelSettings('https://models.example.test', 'secret-key'));
+
+        self::assertSame(0o700, fileperms(\dirname($this->file->path())) & 0o777, 'The first file Airlock writes creates its directory: it must be as closed as the audit log and the grants make it.');
+    }
+
     /**
      * @return iterable<string, array{string}>
      */
