@@ -88,6 +88,18 @@ final class SandboxDetectorTest extends TestCase
         self::assertStringContainsString(\sprintf('the project overlaps %s/.ssh', $home), $sandbox->describe());
     }
 
+    public function testAProjectInsideAKeyStoreThatIsALinkHasNoSandbox(): void
+    {
+        $home = $this->home();
+        new Filesystem()->mkdir($home.'/keys/work');
+        new Filesystem()->symlink($home.'/keys', $home.'/.ssh');
+
+        $sandbox = new SandboxDetector(new SandboxPaths($home, '/nonexistent', new ConfigDirectory($home)), new ProjectDirectory($home.'/keys/work'), SandboxMode::Auto, new ExecutableFinder(), 'Linux')->detect();
+
+        self::assertInstanceOf(NoSandbox::class, $sandbox, 'The sandbox hides where ~/.ssh leads, which holds the project.');
+        self::assertStringContainsString(\sprintf('the project overlaps %s/keys', $home), $sandbox->describe());
+    }
+
     public function testAProjectInsideTheHomeKeepsItsSandbox(): void
     {
         $home = $this->home();

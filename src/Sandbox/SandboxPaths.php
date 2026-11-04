@@ -107,7 +107,7 @@ final readonly class SandboxPaths
         $candidates = [$this->resolved($this->configDirectory->path), $this->resolved($this->airlockDirectory)];
         $home = $this->resolved($this->home);
         foreach (self::KEYS as $key) {
-            $candidates[] = $home.'/'.$key;
+            $candidates[] = $this->resolved($home.'/'.$key);
         }
         foreach ($candidates as $candidate) {
             if ($this->isWithin($candidate, $projectDirectory) || $this->isWithin($projectDirectory, $candidate)) {
