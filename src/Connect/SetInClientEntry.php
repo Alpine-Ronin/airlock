@@ -7,7 +7,8 @@ namespace App\Connect;
 /**
  * A setting on one of the client's own entries, such as its developer extension. A client that adds the entry by
  * default when its configuration has none would add it without the setting: Airlock then writes the entry as the
- * client would, with the setting. Disconnecting puts the setting back as it was, and removes an entry Airlock wrote.
+ * client would, with the setting. Disconnecting puts the setting back as it was, and removes an entry Airlock wrote
+ * while it holds nothing else.
  */
 final readonly class SetInClientEntry implements ConfigChange
 {
@@ -51,10 +52,46 @@ final readonly class SetInClientEntry implements ConfigChange
 
             return;
         }
+        $this->takeBackEntry($root, $entryPath);
+    }
+
+    /**
+     * Only Airlock's setting goes; the entry with it, only while it holds nothing but what Airlock wrote: a field
+     * added to it since, by the user or the client, stays.
+     */
+    private function takeBackEntry(\stdClass $root, ConfigPath $entryPath): void
+    {
         $parent = $entryPath->existingParent($root);
-        if ($parent instanceof \stdClass) {
+        if (!$parent instanceof \stdClass || !property_exists($parent, $entryPath->key())) {
+            return;
+        }
+        $entry = $parent->{$entryPath->key()};
+        if (!$entry instanceof \stdClass) {
+            return;
+        }
+        unset($entry->{$this->path->key()});
+        if ($this->isSameTable($entry, ConfigNode::table($this->entryByDefault))) {
             unset($parent->{$entryPath->key()});
         }
+    }
+
+    private function isSameTable(\stdClass $table, \stdClass $other): bool
+    {
+        $entries = get_object_vars($table);
+        $otherEntries = get_object_vars($other);
+        if (\count($entries) !== \count($otherEntries)) {
+            return false;
+        }
+        return array_all($entries, fn($value, $key): bool => \array_key_exists($key, $otherEntries) && $this->isSameValue($value, $otherEntries[$key]));
+    }
+
+    private function isSameValue(mixed $value, mixed $other): bool
+    {
+        if ($value instanceof \stdClass && $other instanceof \stdClass) {
+            return $this->isSameTable($value, $other);
+        }
+
+        return $value === $other;
     }
 
     private function holds(\stdClass $root, ConfigPath $path): bool

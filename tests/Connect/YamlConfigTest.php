@@ -70,6 +70,21 @@ final class YamlConfigTest extends TestCase
         self::assertSame(Yaml::parse(self::WITH_DEVELOPER), Yaml::parse($content));
     }
 
+    public function testDisconnectingKeepsWhatWasAddedSinceToTheDeveloperExtensionAirlockWrote(): void
+    {
+        $original = "GOOSE_MODE: approve\n";
+        $connected = Yaml::parse(new YamlConfig()->connect($original, $this->changes()));
+        self::assertIsArray($connected);
+        $edited = Yaml::dump(array_replace_recursive($connected, ['extensions' => ['developer' => ['timeout' => 600]]]), 4);
+
+        $content = new YamlConfig()->disconnect($edited, $this->changes(), $original);
+
+        self::assertSame([
+            'GOOSE_MODE' => 'approve',
+            'extensions' => ['developer' => ['name' => 'developer', 'type' => 'platform', 'timeout' => 600]],
+        ], Yaml::parse($content));
+    }
+
     public function testToolsTheUserHadChosenComeBack(): void
     {
         $original = self::WITH_DEVELOPER."\n    available_tools: [shell, tree]\n";
