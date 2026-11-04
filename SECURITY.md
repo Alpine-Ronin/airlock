@@ -19,7 +19,8 @@ run Airlock from source or Docker.
 
 Airlock protects a user from what their agent read. A vulnerability is a way for the agent, or for text it read, to:
 
-- run a command the user was not asked about, or one they refused;
+- run a command the user should have been asked about without asking them, or one they refused (a command
+  harmless to run, or covered by a grant, runs without asking by design);
 - have a grant cover more than the form said it would (a grant for `make test` covering `make test; rm -rf ~`);
 - write outside the project, `/tmp` and package caches from inside the sandbox, read the user's keys or Airlock's
   own files, or reach the network with `strict`;
