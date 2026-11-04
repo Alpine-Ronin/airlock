@@ -38,7 +38,8 @@ final readonly class ModelSettingsFile
         try {
             $content = Yaml::parseFile($path);
         } catch (ParseException $e) {
-            throw new InvalidModelSettingsException(\sprintf('%s is not valid YAML: %s', $path, $e->getMessage()), $e->getCode(), previous: $e);
+            // The parser's message repeats the line it stopped at, which can be the key's.
+            throw new InvalidModelSettingsException(\sprintf('%s is not valid YAML at line %d.', $path, $e->getParsedLine()), $e->getCode(), previous: $e);
         }
         if (!\is_array($content) || ([] !== $content && array_is_list($content))) {
             throw new InvalidModelSettingsException(\sprintf('%s holds no settings.', $path));

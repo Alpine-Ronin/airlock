@@ -81,4 +81,17 @@ final class ModelSettingsFileTest extends TestCase
 
         $this->file->read();
     }
+
+    public function testAKeyInAFileThatIsNotYamlIsNotRepeatedInTheError(): void
+    {
+        $this->filesystem->dumpFile($this->file->path(), "base_url: https://models.example.test\napi_key: sk-secret-1234: x\n");
+
+        try {
+            $this->file->read();
+            self::fail('A file that is not YAML is refused.');
+        } catch (InvalidModelSettingsException $e) {
+            self::assertStringNotContainsString('sk-secret', $e->getMessage(), 'The message is shown by airlock doctor and logged: it must not carry the key.');
+            self::assertStringContainsString('models.yaml is not valid YAML', $e->getMessage());
+        }
+    }
 }
