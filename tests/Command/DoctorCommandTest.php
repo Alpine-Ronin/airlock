@@ -177,13 +177,32 @@ final class DoctorCommandTest extends KernelTestCase
 
     public function testAConnectedClientIsNamed(): void
     {
-        new CommandTester(new Application(self::bootKernel())->find('connect'))->execute(['client' => 'claude-code']);
-        self::ensureKernelShutdown();
+        $this->connectClaudeCode();
         $tester = $this->tester();
 
-        $tester->execute([]);
-
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
         self::assertStringContainsString('Clients: Connected to Claude Code (project)', $this->display($tester));
+    }
+
+    public function testAClientThatStartsAnotherAirlockIsNamed(): void
+    {
+        $this->connectClaudeCode();
+        $servers = (string) file_get_contents(self::PROJECT.'/.mcp.json');
+        $this->filesystem->dumpFile(self::PROJECT.'/.mcp.json', (string) preg_replace('/"command": "[^"]*"/', '"command": "/opt/old/airlock"', $servers));
+        $tester = $this->tester();
+
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+        self::assertStringContainsString('Clients: Claude Code (project) starts another Airlock than this one, such as an earlier install', $this->display($tester));
+    }
+
+    public function testAClientThatStillHasItsShellToolIsAProblem(): void
+    {
+        $this->connectClaudeCode();
+        $this->filesystem->remove(self::PROJECT.'/.claude/settings.local.json');
+        $tester = $this->tester();
+
+        self::assertSame(Command::FAILURE, $tester->execute([]));
+        self::assertStringContainsString('Claude Code (project) starts Airlock, but not all that connecting writes, such as its own shell tool off: the agent may run commands around Airlock', $this->display($tester));
     }
 
     public function testWithoutAConnectedClientItSaysHowToConnectOne(): void
@@ -208,6 +227,12 @@ final class DoctorCommandTest extends KernelTestCase
     private function assertPermissionsAreEnforced(string $unreadable): void
     {
         self::assertIsNotReadable($unreadable, 'Run the tests as a user that file permissions apply to, not root: this test needs a path it cannot read.');
+    }
+
+    private function connectClaudeCode(): void
+    {
+        new CommandTester(new Application(self::bootKernel())->find('connect'))->execute(['client' => 'claude-code']);
+        self::ensureKernelShutdown();
     }
 
     private function tester(): CommandTester
