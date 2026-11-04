@@ -3,6 +3,14 @@
 What changed in each release, newest first. Versions follow [semantic versioning](https://semver.org): until 1.0, a
 minor version may change the configuration and file formats.
 
+## Unreleased
+
+### Fixed
+
+- `airlock doctor` said a client was connected to no Airlock when it starts another one, such as an earlier install,
+  and said nothing when the client starts this Airlock with its own shell tool back on: it now names both, the second
+  as a problem.
+
 ## 0.3.0 (2026-11-04)
 
 ### Added
