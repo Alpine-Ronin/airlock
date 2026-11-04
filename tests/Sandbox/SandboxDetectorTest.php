@@ -53,7 +53,7 @@ final class SandboxDetectorTest extends TestCase
         $sandbox = new SandboxDetector(new SandboxPaths($home, '/nonexistent', new ConfigDirectory($home)), new ProjectDirectory($home.'/'.$project), SandboxMode::Auto, new ExecutableFinder(), 'Linux')->detect();
 
         self::assertInstanceOf(NoSandbox::class, $sandbox, 'A command could create a missing ~/.ssh/config, whose ProxyCommand ssh runs later as the user.');
-        self::assertStringContainsString(\sprintf('the project holds %s/', $home), $sandbox->describe());
+        self::assertStringContainsString(\sprintf('the project overlaps %s/', $home), $sandbox->describe());
     }
 
     /**
@@ -63,6 +63,29 @@ final class SandboxDetectorTest extends TestCase
     {
         yield 'the home itself, without a .ssh yet' => ['.'];
         yield 'a directory above the home' => ['..'];
+    }
+
+    public function testAProjectHoldingAirlockItselfHasNoSandbox(): void
+    {
+        $home = $this->home();
+        new Filesystem()->mkdir($home.'/work/airlock');
+        $airlock = $home.'/work/airlock';
+
+        $sandbox = new SandboxDetector(new SandboxPaths($home, $airlock, new ConfigDirectory($home)), new ProjectDirectory($home.'/work'), SandboxMode::Auto, new ExecutableFinder(), 'Linux')->detect();
+
+        self::assertInstanceOf(NoSandbox::class, $sandbox, 'A command could change Airlock\'s code, or create the .env.local it loads, and the next server would run it.');
+        self::assertStringContainsString(\sprintf('the project overlaps %s', $airlock), $sandbox->describe());
+    }
+
+    public function testAProjectInsideAKeyStoreHasNoSandbox(): void
+    {
+        $home = $this->home();
+        new Filesystem()->mkdir($home.'/.ssh/work');
+
+        $sandbox = new SandboxDetector(new SandboxPaths($home, '/nonexistent', new ConfigDirectory($home)), new ProjectDirectory($home.'/.ssh/work'), SandboxMode::Auto, new ExecutableFinder(), 'Linux')->detect();
+
+        self::assertInstanceOf(NoSandbox::class, $sandbox, 'Hiding ~/.ssh would hide the project from its own commands.');
+        self::assertStringContainsString(\sprintf('the project overlaps %s/.ssh', $home), $sandbox->describe());
     }
 
     public function testAProjectInsideTheHomeKeepsItsSandbox(): void

@@ -96,26 +96,38 @@ final readonly class SandboxPaths
     }
 
     /**
-     * The first key store or Airlock file the project holds, existing or not, or null when it holds none. A sandbox
-     * lets a command write anywhere in the project, so it cannot keep these out of reach there: a command could
-     * create a missing `~/.ssh/config`, or rename the directory above a hidden one and write in it.
+     * The first key store, Airlock directory or Airlock installation the project overlaps, existing or not, or null
+     * when it overlaps none. A sandbox lets a command write anywhere in the project, so it cannot keep these out of
+     * reach there: a command could create a missing `~/.ssh/config` or Airlock's `.env.local`, change Airlock's own
+     * code, or rename the directory above a hidden one and write in it. A project inside one of them would be hidden
+     * from its own commands.
      */
-    public function heldBy(string $projectDirectory): ?string
+    public function overlappedBy(string $projectDirectory): ?string
     {
-        $home = realpath($this->home);
-        $home = false === $home ? $this->home : $home;
-        $configDirectory = realpath($this->configDirectory->path);
-        $candidates = [false === $configDirectory ? $this->configDirectory->path : $configDirectory];
+        $candidates = [$this->resolved($this->configDirectory->path), $this->resolved($this->airlockDirectory)];
+        $home = $this->resolved($this->home);
         foreach (self::KEYS as $key) {
             $candidates[] = $home.'/'.$key;
         }
         foreach ($candidates as $candidate) {
-            if ($candidate === $projectDirectory || str_starts_with($candidate, rtrim($projectDirectory, '/').'/')) {
+            if ($this->isWithin($candidate, $projectDirectory) || $this->isWithin($projectDirectory, $candidate)) {
                 return $candidate;
             }
         }
 
         return null;
+    }
+
+    private function resolved(string $path): string
+    {
+        $real = realpath($path);
+
+        return false === $real ? $path : $real;
+    }
+
+    private function isWithin(string $path, string $directory): bool
+    {
+        return $path === $directory || str_starts_with($path, rtrim($directory, '/').'/');
     }
 
     /**

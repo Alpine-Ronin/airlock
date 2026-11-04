@@ -37,9 +37,9 @@ final class SandboxDetector
         if (SandboxMode::Off === $this->mode) {
             return new NoSandbox('turned off with AIRLOCK_SANDBOX=off');
         }
-        $held = $this->paths->heldBy($this->projectDirectory->path);
-        if (null !== $held) {
-            return new NoSandbox(\sprintf('the project holds %s, which no sandbox can keep a command from changing there; open a project inside your home instead', $held));
+        $overlapped = $this->paths->overlappedBy($this->projectDirectory->path);
+        if (null !== $overlapped) {
+            return new NoSandbox(\sprintf('the project overlaps %s, which no sandbox can then keep a command from changing; open a project apart from it', $overlapped));
         }
         $cutsNetwork = SandboxMode::Strict === $this->mode;
 
