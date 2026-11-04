@@ -9,16 +9,29 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Lock\LockFactory;
 
 /**
- * Every decision, appended as one JSON line to a file in Airlock's directory, where no command can change it.
+ * Every decision, appended as one JSON line to a file in Airlock's directory, where no command can change it. A full
+ * log is moved aside, to `audit.1.jsonl`, the one before to `audit.2.jsonl`, and so on: the oldest beyond those kept
+ * goes, so the log never fills the disk.
  */
 final readonly class AuditLog
 {
+    /** About 20,000 decisions. */
+    public const int ROTATION_SIZE = 10 * 1024 * 1024;
+
+    public const int KEPT_FILES = 5;
+
     private const int CHUNK = 64 * 1024;
 
+    /**
+     * @param positive-int $rotationSize the size in bytes from which the log is moved aside
+     * @param positive-int $keptFiles    how many logs moved aside are kept
+     */
     public function __construct(
         private ConfigDirectory $configDirectory,
         private LockFactory $lockFactory,
         private Filesystem $filesystem = new Filesystem(),
+        private int $rotationSize = self::ROTATION_SIZE,
+        private int $keptFiles = self::KEPT_FILES,
     ) {
     }
 
@@ -28,6 +41,10 @@ final readonly class AuditLog
         $lock->acquire(blocking: true);
         try {
             $this->closeToOthers();
+            if ($this->isFull()) {
+                $this->moveAside();
+                $this->closeToOthers();
+            }
             $this->filesystem->appendToFile($this->file(), json_encode($entry->toArray(), \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES)."\n");
         } finally {
             $lock->release();
@@ -41,24 +58,55 @@ final readonly class AuditLog
      */
     public function lastEntriesFor(string $project, int $count): array
     {
-        $file = $this->file();
-        if ($count <= 0 || !is_file($file)) {
+        if ($count <= 0) {
             return [];
         }
 
+        // Held while reading, so that a log moved aside meanwhile is not read twice or skipped.
+        $lock = $this->lockFactory->createLock('airlock-audit');
+        $lock->acquire(blocking: true);
+        try {
+            return $this->readLastEntriesFor($project, $count);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
+     * @param positive-int $count
+     *
+     * @return list<string>
+     */
+    private function readLastEntriesFor(string $project, int $count): array
+    {
         $newestFirst = [];
-        foreach ($this->linesNewestFirst($file) as $line) {
-            $entry = json_decode($line, true);
-            if (!\is_array($entry) || ($entry['project'] ?? null) !== $project) {
-                continue;
-            }
-            $newestFirst[] = $line;
-            if (\count($newestFirst) === $count) {
-                break;
+        foreach ($this->filesNewestFirst() as $file) {
+            foreach ($this->linesNewestFirst($file) as $line) {
+                $entry = json_decode($line, true);
+                if (!\is_array($entry) || ($entry['project'] ?? null) !== $project) {
+                    continue;
+                }
+                $newestFirst[] = $line;
+                if (\count($newestFirst) === $count) {
+                    return array_reverse($newestFirst);
+                }
             }
         }
 
         return array_reverse($newestFirst);
+    }
+
+    /**
+     * @return list<string> the log, then the logs moved aside, those that exist
+     */
+    private function filesNewestFirst(): array
+    {
+        $files = [$this->file()];
+        for ($number = 1; $number <= $this->keptFiles; ++$number) {
+            $files[] = $this->movedAside($number);
+        }
+
+        return array_values(array_filter($files, is_file(...)));
     }
 
     /**
@@ -152,8 +200,35 @@ final readonly class AuditLog
         }
     }
 
+    private function isFull(): bool
+    {
+        clearstatcache(true, $this->file());
+        $size = filesize($this->file());
+
+        return false !== $size && $size >= $this->rotationSize;
+    }
+
+    /**
+     * Renames keep each file private, and keep the entries of one whole: a reader never sees half a move.
+     */
+    private function moveAside(): void
+    {
+        $this->filesystem->remove($this->movedAside($this->keptFiles));
+        for ($number = $this->keptFiles - 1; $number >= 1; --$number) {
+            if (is_file($this->movedAside($number))) {
+                $this->filesystem->rename($this->movedAside($number), $this->movedAside($number + 1), true);
+            }
+        }
+        $this->filesystem->rename($this->file(), $this->movedAside(1), true);
+    }
+
     private function file(): string
     {
         return $this->configDirectory->path.'/audit.jsonl';
+    }
+
+    private function movedAside(int $number): string
+    {
+        return \sprintf('%s/audit.%d.jsonl', $this->configDirectory->path, $number);
     }
 }

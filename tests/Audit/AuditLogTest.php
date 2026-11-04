@@ -85,9 +85,11 @@ final class AuditLogTest extends TestCase
         fclose($handle);
         $memoryLimit = \ini_get('memory_limit');
 
+        $log = new AuditLog(new ConfigDirectory(self::HOME), new LockFactory(new InMemoryStore()), rotationSize: 64 * 1024 * 1024);
+
         ini_set('memory_limit', (string) (memory_get_usage() + 16 * 1024 * 1024));
         try {
-            $this->log->append($this->entry('/project', 'ls'));
+            $log->append($this->entry('/project', 'ls'));
         } finally {
             ini_set('memory_limit', $memoryLimit);
         }
@@ -187,6 +189,80 @@ final class AuditLogTest extends TestCase
         $this->log->append($this->entry('/project', 'after'));
 
         self::assertSame(['before', $longCommand, 'after'], $this->commandsOf($this->log->lastEntriesFor('/project', 10)));
+    }
+
+    public function testAFullLogIsMovedAsideAndANewOneStarted(): void
+    {
+        $log = $this->rotatingLog(keptFiles: 3);
+
+        $log->append($this->entry('/project', 'first'));
+        $log->append($this->entry('/project', 'second'));
+
+        self::assertSame(['first'], $this->commandsOf($this->linesOf(self::HOME.'/.config/airlock/audit.1.jsonl')));
+        self::assertSame(['second'], $this->commandsOf($this->linesOf(self::LOG)));
+    }
+
+    public function testOnlyTheLastMovedLogsAreKept(): void
+    {
+        $log = $this->rotatingLog(keptFiles: 2);
+
+        foreach (['first', 'second', 'third', 'fourth'] as $command) {
+            $log->append($this->entry('/project', $command));
+        }
+
+        self::assertSame(['second'], $this->commandsOf($this->linesOf(self::HOME.'/.config/airlock/audit.2.jsonl')));
+        self::assertFileDoesNotExist(self::HOME.'/.config/airlock/audit.3.jsonl', 'The log stops growing: the oldest moved log goes.');
+    }
+
+    public function testMovedLogsStayReadableByTheirOwnerOnly(): void
+    {
+        $log = $this->rotatingLog(keptFiles: 3);
+        $log->append($this->entry('/project', 'first'));
+        chmod(self::LOG, 0o644);
+
+        $log->append($this->entry('/project', 'second'));
+
+        self::assertSame(0o600, fileperms(self::HOME.'/.config/airlock/audit.1.jsonl') & 0o777, 'A log an earlier version left open is closed before it is moved aside.');
+        self::assertSame(0o600, fileperms(self::LOG) & 0o777);
+    }
+
+    public function testTheLastEntriesAreReadAcrossMovedLogs(): void
+    {
+        $log = $this->rotatingLog(keptFiles: 3);
+        foreach (['first', 'second', 'third'] as $command) {
+            $log->append($this->entry('/project', $command));
+        }
+
+        self::assertSame(['second', 'third'], $this->commandsOf($log->lastEntriesFor('/project', 2)));
+        self::assertSame(['first', 'second', 'third'], $this->commandsOf($log->lastEntriesFor('/project', 10)));
+    }
+
+    public function testALogUnderItsSizeIsNotMoved(): void
+    {
+        $this->log->append($this->entry('/project', 'first'));
+        $this->log->append($this->entry('/project', 'second'));
+
+        self::assertFileDoesNotExist(self::HOME.'/.config/airlock/audit.1.jsonl');
+    }
+
+    /**
+     * A log that is full after each entry: every file holds one.
+     *
+     * @param positive-int $keptFiles
+     */
+    private function rotatingLog(int $keptFiles): AuditLog
+    {
+        return new AuditLog(new ConfigDirectory(self::HOME), new LockFactory(new InMemoryStore()), rotationSize: 1, keptFiles: $keptFiles);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function linesOf(string $file): array
+    {
+        $lines = file($file, \FILE_IGNORE_NEW_LINES);
+
+        return false === $lines ? [] : $lines;
     }
 
     /**
