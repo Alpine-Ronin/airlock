@@ -345,6 +345,9 @@ runs PHP CS Fixer, Rector, PHPStan (level max, strict rules, no baseline) and PH
 reach the network: model calls are answered from recorded responses, in `tests/Fixtures/models/`. The bubblewrap
 and end-to-end tests need bubblewrap working on the machine.
 
+[CONTRIBUTING.md](CONTRIBUTING.md) says how to set up and send a change, [CHANGELOG.md](CHANGELOG.md) what each
+release changed. A vulnerability goes to [SECURITY.md](SECURITY.md), never to an issue.
+
 ## License
 
 [MIT](LICENSE)
