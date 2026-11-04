@@ -44,6 +44,10 @@ final readonly class Bubblewrap implements Sandbox
         foreach ($this->paths->hidden() as $hidden) {
             array_push($arguments, ...$this->hide($hidden));
         }
+        $knownHosts = $sshAgent instanceof SshAgent ? $this->paths->knownHosts() : null;
+        if (null !== $knownHosts) {
+            array_push($arguments, ...$this->showReadOnly($knownHosts));
+        }
         foreach (self::AGENT_VARIABLES as $variable) {
             $arguments[] = '--unsetenv';
             $arguments[] = $variable;
@@ -72,6 +76,19 @@ final readonly class Bubblewrap implements Sandbox
             'Sandbox (bubblewrap): writes only to the project and package caches, with a private /tmp; your keys and agents are out of reach%s.',
             $this->cutsNetwork ? '; no network' : '',
         );
+    }
+
+    /**
+     * A file inside a hidden directory, bound back read-only: the empty directory covering it is made writable just
+     * long enough to make the mount point, then read-only again.
+     *
+     * @return list<string>
+     */
+    private function showReadOnly(string $file): array
+    {
+        $directory = \dirname($file);
+
+        return ['--tmpfs', $directory, '--ro-bind', $file, $file, '--remount-ro', $directory];
     }
 
     /**

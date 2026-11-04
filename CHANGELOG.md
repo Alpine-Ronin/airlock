@@ -3,6 +3,13 @@
 What changed in each release, newest first. Versions follow [semantic versioning](https://semver.org): until 1.0, a
 minor version may change the configuration and file formats.
 
+## Unreleased
+
+### Fixed
+
+- A command lent the SSH agent, such as `git push` over SSH, could not check the server's host key, so ssh refused to
+  connect: it now reads `~/.ssh/known_hosts`, read-only. The keys and the rest of `~/.ssh` stay hidden.
+
 ## 0.3.0 (2026-11-04)
 
 ### Added

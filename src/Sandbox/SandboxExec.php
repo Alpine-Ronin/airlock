@@ -32,7 +32,7 @@ final readonly class SandboxExec implements Sandbox
             }
         }
 
-        return ['sandbox-exec', '-p', $this->profile($projectDirectory), 'env', ...$unset, ...$command];
+        return ['sandbox-exec', '-p', $this->profile($projectDirectory, $sshAgent instanceof SshAgent), 'env', ...$unset, ...$command];
     }
 
     #[\Override]
@@ -44,7 +44,7 @@ final readonly class SandboxExec implements Sandbox
         );
     }
 
-    private function profile(string $projectDirectory): string
+    private function profile(string $projectDirectory, bool $showsKnownHosts): string
     {
         $writable = array_map(
             fn (string $path): string => \sprintf('(subpath %s)', $this->quote($path)),
@@ -57,6 +57,10 @@ final readonly class SandboxExec implements Sandbox
         }
         foreach ($this->paths->hidden() as $hidden) {
             $rules[] = \sprintf('(deny file-read* (subpath %s))', $this->quote($hidden));
+        }
+        $knownHosts = $showsKnownHosts ? $this->paths->knownHosts() : null;
+        if (null !== $knownHosts) {
+            $rules[] = \sprintf('(allow file-read* (literal %s))', $this->quote($knownHosts));
         }
         if ($this->cutsNetwork) {
             $rules[] = '(deny network*)';

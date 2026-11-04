@@ -49,6 +49,20 @@ final class SandboxExecTest extends TestCase
         self::assertStringContainsString('(deny network*)', $command[2]);
     }
 
+    public function testALentSshAgentComesWithTheKnownHostsAlone(): void
+    {
+        new Filesystem()->dumpFile(self::HOME.'/.ssh/known_hosts', "github.com ssh-ed25519 AAAA\n");
+        $sandbox = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), cutsNetwork: false);
+        $allowed = \sprintf('(allow file-read* (literal "%s/.ssh/known_hosts"))', realpath(self::HOME));
+
+        $lent = $sandbox->confine(['true'], '/p', new SshAgent('/private/tmp/agent.sock'))[2];
+        $notLent = $sandbox->confine(['true'], '/p')[2];
+
+        self::assertStringContainsString($allowed, $lent);
+        self::assertGreaterThan(strpos($lent, '(deny file-read* (subpath'), strpos($lent, $allowed), 'Seatbelt applies the last rule that matches: the allowance must come after the denial of ~/.ssh.');
+        self::assertStringNotContainsString('known_hosts', $notLent);
+    }
+
     public function testALentSshAgentKeepsItsVariable(): void
     {
         $command = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), cutsNetwork: false)->confine(['true'], '/p', new SshAgent('/private/tmp/agent.sock'));

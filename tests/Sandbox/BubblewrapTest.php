@@ -34,6 +34,8 @@ final class BubblewrapTest extends TestCase
 
     private string $root;
 
+    private const string KNOWN_HOST = "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl\n";
+
     private ?Process $sshAgent = null;
 
     #[\Override]
@@ -225,6 +227,29 @@ final class BubblewrapTest extends TestCase
         $result = $this->runner(SandboxMode::Auto, 30, null, $socket)->runWithSshAgent('ssh-add -l; echo "exit $?"');
 
         self::assertStringEndsWith("exit 1\n", $result->output, 'ssh-add exits with 1 when it reaches an agent that holds no key.');
+    }
+
+    public function testACommandLentTheSshAgentReadsTheKnownHostsAndNoKey(): void
+    {
+        $this->filesystem->dumpFile($this->root.'/home/.ssh/known_hosts', self::KNOWN_HOST);
+        $socket = $this->startSshAgent();
+        $knownHosts = $this->root.'/home/.ssh/known_hosts';
+
+        $result = $this->runner(SandboxMode::Auto, 30, null, $socket)->runWithSshAgent(\sprintf('ssh-keygen -F github.com -f %1$s; echo "exit $?"; cat %2$s/home/.ssh/id_ed25519; echo forged >> %1$s; echo end', $knownHosts, $this->root));
+
+        self::assertStringContainsString('# Host github.com found: line 1', $result->output, 'Without the known hosts, ssh refuses to connect: Host key verification failed.');
+        self::assertStringNotContainsString('PRIVATE-KEY-VALUE', $result->output, 'The keys stay hidden.');
+        self::assertSame(self::KNOWN_HOST, $this->filesystem->readFile($knownHosts), 'A command must not vouch for a forged server.');
+    }
+
+    public function testTheKnownHostsAreHiddenFromACommandNotLentTheSshAgent(): void
+    {
+        $this->filesystem->dumpFile($this->root.'/home/.ssh/known_hosts', self::KNOWN_HOST);
+
+        $result = $this->runInSandbox(\sprintf('cat %s/home/.ssh/known_hosts; echo end', $this->root));
+
+        self::assertStringNotContainsString('github.com', $result->output, 'Which servers the user reaches is theirs to tell.');
+        self::assertStringContainsString('end', $result->output);
     }
 
     public function testStrictModeLeavesNoNetworkButLoopback(): void

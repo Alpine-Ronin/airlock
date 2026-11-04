@@ -96,6 +96,21 @@ final readonly class SandboxPaths
     }
 
     /**
+     * The user's known hosts, for a command lent the SSH agent: without them ssh cannot tell the real server from
+     * one pretending to be it, and refuses to connect. They hold servers' public keys, nothing secret, and stay
+     * read-only so that a command cannot vouch for a forged one. Null when there are none.
+     */
+    public function knownHosts(): ?string
+    {
+        $sshDirectory = realpath($this->home.'/.ssh');
+        if (false === $sshDirectory || !is_file($sshDirectory.'/known_hosts')) {
+            return null;
+        }
+
+        return $sshDirectory.'/known_hosts';
+    }
+
+    /**
      * Paths of the project a command may read but not change. In a git repository, those git would otherwise create
      * are made first, empty, as `git init` makes them: a path that does not exist cannot be kept read-only, and a
      * command could plant it.
