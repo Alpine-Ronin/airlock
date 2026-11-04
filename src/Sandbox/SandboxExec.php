@@ -56,7 +56,8 @@ final readonly class SandboxExec implements Sandbox
             $rules[] = \sprintf('(deny file-write* (subpath %s))', $this->quote($readOnly));
         }
         foreach ($this->paths->hidden() as $hidden) {
-            $rules[] = \sprintf('(deny file-read* (subpath %s))', $this->quote($hidden));
+            // Writes too: a writable path can hold a hidden one, as when the project is the home directory.
+            $rules[] = \sprintf('(deny file-read* file-write* (subpath %s))', $this->quote($hidden));
         }
         $knownHosts = $showsKnownHosts ? $this->paths->knownHosts() : null;
         if (null !== $knownHosts) {

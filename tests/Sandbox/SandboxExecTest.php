@@ -38,8 +38,24 @@ final class SandboxExecTest extends TestCase
         self::assertSame(['env', '-u', 'SSH_AUTH_SOCK', '-u', 'SSH_AGENT_PID', '-u', 'GPG_AGENT_INFO', 'bash', '-c', 'ls'], \array_slice($command, 3));
         self::assertStringContainsString('(deny file-write*)', $command[2]);
         self::assertStringContainsString('(subpath "/Users/me/project")', $command[2]);
-        self::assertStringContainsString(\sprintf('(deny file-read* (subpath "%s/.ssh"))', realpath(self::HOME)), $command[2]);
+        self::assertStringContainsString(\sprintf('(deny file-read* file-write* (subpath "%s/.ssh"))', realpath(self::HOME)), $command[2]);
         self::assertStringNotContainsString('network', $command[2]);
+    }
+
+    public function testWithTheHomeAsTheProjectTheKeysAndAirlocksFilesStayUnwritable(): void
+    {
+        new Filesystem()->mkdir(self::HOME.'/.config/airlock');
+        new Filesystem()->dumpFile(self::HOME.'/.ssh/known_hosts', "github.com ssh-ed25519 AAAA\n");
+        $home = (string) realpath(self::HOME);
+        $profile = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), cutsNetwork: false)->confine(['true'], $home, new SshAgent('/private/tmp/agent.sock'))[2];
+
+        foreach ([$home.'/.ssh', $home.'/.config/airlock'] as $hidden) {
+            $denied = \sprintf('(deny file-read* file-write* (subpath "%s"))', $hidden);
+            self::assertStringContainsString($denied, $profile);
+            self::assertGreaterThan(strpos($profile, \sprintf('(subpath "%s")', $home)), strpos($profile, $denied), 'Seatbelt applies the last rule that matches: the denial must come after the project\'s write allowance.');
+        }
+        self::assertStringContainsString(\sprintf('(allow file-read* (literal "%s/.ssh/known_hosts"))', $home), $profile);
+        self::assertStringNotContainsString('(allow file-write* (literal', $profile, 'A command must not vouch for a forged server.');
     }
 
     public function testStrictCutsTheNetwork(): void
@@ -59,7 +75,7 @@ final class SandboxExecTest extends TestCase
         $notLent = $sandbox->confine(['true'], '/p')[2];
 
         self::assertStringContainsString($allowed, $lent);
-        self::assertGreaterThan(strpos($lent, '(deny file-read* (subpath'), strpos($lent, $allowed), 'Seatbelt applies the last rule that matches: the allowance must come after the denial of ~/.ssh.');
+        self::assertGreaterThan(strpos($lent, '(deny file-read* file-write* (subpath'), strpos($lent, $allowed), 'Seatbelt applies the last rule that matches: the allowance must come after the denial of ~/.ssh.');
         self::assertStringNotContainsString('known_hosts', $notLent);
     }
 

@@ -13,6 +13,12 @@ minor version may change the configuration and file formats.
 - A command lent the SSH agent, such as `git push` over SSH, could not check the server's host key, so ssh refused to
   connect: it now reads `~/.ssh/known_hosts`, read-only. The keys and the rest of `~/.ssh` stay hidden (#39).
 
+### Security
+
+- On macOS, a command run with a project that holds the user's keys or Airlock's own files, such as the home directory,
+  could write to them: they were hidden from reading only. They are now out of reach for writing too, as on Linux
+  (#39).
+
 ## 0.3.0 (2026-11-04)
 
 ### Added
