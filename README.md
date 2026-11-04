@@ -272,8 +272,8 @@ cp -R ~/airlock/demo ~/airlock-demo
    The form opens with the rule, *"Asked every time: `rm -rf build`: it deletes recursively."*, then a model's
    reading of it, labelled as such, and offers only *once* or *refuse*. Refuse: `build/` stays.
 
-3. **Everything is on record.** Ask the agent to read the `airlock://audit` resource, or open
-   `~/.config/airlock/audit.jsonl`.
+3. **Everything is on record.** Ask the agent to read the `airlock://audit` resource, or run `airlock log` in a
+   terminal.
 
 The form looks like any MCP form in your client. In Claude Code's: `→` opens the Decision field, `↓` moves, `Enter`
 picks; focus then goes to *Accept* by itself, so press `Enter` once more.
@@ -306,6 +306,11 @@ Airlock's own files live in `~/.config/airlock/` (or `$XDG_CONFIG_HOME/airlock/`
 | `projects/<name>-<hash>/policy.yaml` | Commands you refuse in one project |
 | `projects/<name>-<hash>/grants.yaml` | What *always for this project* allowed |
 | `audit.jsonl` | Every decision, one JSON object per line |
+
+From the project, `airlock grants` lists what *always for this project* allowed there, numbered, and
+`airlock grants --revoke <number>` takes one back: Airlock asks about that command again from the next time. A
+*this session* grant lives in the running server and ends with it. `airlock log` shows the last decisions in plain
+words (`--last 50` for more).
 
 A project can also commit `.airlock.yaml`. Like every policy file, it can only refuse:
 
