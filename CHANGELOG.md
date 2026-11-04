@@ -9,16 +9,20 @@ minor version may change the configuration and file formats.
 
 - `airlock grants` lists the commands allowed always in the project, and `--revoke` takes them back (#33).
 - `airlock log` shows the project's last decisions in plain words (#33).
-- `airlock doctor` says whether Airlock can protect the project, and what to do when it cannot.
+- `airlock doctor` says whether Airlock can protect the project, and what to do when it cannot (#35).
+- The audit log moves aside at 10 MiB, and the five last logs moved aside are kept, so it never fills the disk;
+  `airlock log` and `airlock://audit` read across them.
 
 ### Fixed
 
 - `airlock configure`, run before anything else, created Airlock's directory open to others; it is now open to its
-  owner only, as the rest of Airlock makes it.
+  owner only, as the rest of Airlock makes it (#35).
 
 ### Security
 
 - Commands shown by `airlock grants` and `airlock log` cannot write terminal escape sequences or console tags (#33).
+- A `models.yaml` that is not valid YAML no longer copies its lines, the key's among them, into the error that
+  `airlock doctor`, `airlock configure` and the server's log show (#35).
 
 ## 0.2.6 (2026-11-04)
 

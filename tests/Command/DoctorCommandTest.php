@@ -147,6 +147,7 @@ final class DoctorCommandTest extends KernelTestCase
         $tester = $this->tester();
 
         try {
+            $this->assertPermissionsAreEnforced(self::AIRLOCK.'/projects');
             $status = $tester->execute([]);
         } finally {
             $this->filesystem->chmod(self::AIRLOCK.'/projects', 0o700);
@@ -164,6 +165,7 @@ final class DoctorCommandTest extends KernelTestCase
         $tester = $this->tester();
 
         try {
+            $this->assertPermissionsAreEnforced(self::PROJECT.'/.mcp.json');
             $status = $tester->execute([]);
         } finally {
             $this->filesystem->chmod(self::PROJECT.'/.mcp.json', 0o600);
@@ -201,6 +203,11 @@ final class DoctorCommandTest extends KernelTestCase
 
         self::assertDirectoryDoesNotExist(self::AIRLOCK, 'The doctor looks, and changes nothing.');
         self::assertSame([], array_values(array_diff((array) scandir(self::PROJECT), ['.', '..'])));
+    }
+
+    private function assertPermissionsAreEnforced(string $unreadable): void
+    {
+        self::assertIsNotReadable($unreadable, 'Run the tests as a user that file permissions apply to, not root: this test needs a path it cannot read.');
     }
 
     private function tester(): CommandTester

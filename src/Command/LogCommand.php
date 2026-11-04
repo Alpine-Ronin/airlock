@@ -62,7 +62,7 @@ final class LogCommand extends Command
         }
         $io->title(\sprintf('Last decisions in %s', $this->projectDirectory->path));
         $io->table(['When', 'Command', 'Decision', 'Output'], $rows);
-        $io->text(\sprintf('Every detail of each, one JSON object per line: %s/audit.jsonl', $this->configDirectory->path));
+        $io->text(\sprintf('Every detail of each, one JSON object per line: %s/audit.jsonl, and older decisions in audit.1.jsonl to audit.%d.jsonl.', $this->configDirectory->path, AuditLog::KEPT_FILES));
 
         return Command::SUCCESS;
     }

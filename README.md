@@ -305,7 +305,7 @@ Airlock's own files live in `~/.config/airlock/` (or `$XDG_CONFIG_HOME/airlock/`
 | `policy.yaml` | Commands you refuse everywhere |
 | `projects/<name>-<hash>/policy.yaml` | Commands you refuse in one project |
 | `projects/<name>-<hash>/grants.yaml` | What *always for this project* allowed |
-| `audit.jsonl` | Every decision, one JSON object per line |
+| `audit.jsonl` | Every decision, one JSON object per line. At 10 MiB, about 20,000 decisions, it moves to `audit.1.jsonl`, the one before to `audit.2.jsonl`, and so on up to `audit.5.jsonl`: the oldest goes |
 
 From the project, `airlock grants` lists what *always for this project* allowed there, numbered, and
 `airlock grants --revoke <number>` takes one back: Airlock asks about that command again from the next time. A
