@@ -35,7 +35,7 @@ final class ShellParserFuzzTest extends TestCase
      * It fails or succeeds by a hash of those words and the run's salt: each run takes other branches of `&&` and `||`,
      * the same ones every time, and a counter would not do, as subshells and pipes cannot share one.
      */
-    private const string RECORDER = <<<'BASH'
+    private const string HANDLER = <<<'BASH'
         command_not_found_handle() {
             local record character hash=$AIRLOCK_FUZZ_SALT index
             printf -v record '%s\037' "$@"
@@ -46,12 +46,22 @@ final class ShellParserFuzzTest extends TestCase
             done
             return $(( hash & 1 ))
         }
+        BASH;
+
+    private const string RECORDER = self::HANDLER.<<<'BASH'
+
         PATH=/nonexistent
         for builtin in $(compgen -b); do case $builtin in enable|local|printf|return) ;; *) enable -n "$builtin" ;; esac; done
         BASH;
 
     /** Each line runs once per salt: enough for every branch of the conditions below to run in one of them. */
     private const array SALTS = [1, 2, 3, 4];
+
+    /**
+     * A program named by its path is run, not looked up: this one, the only path the words below name, records itself
+     * as the handler does.
+     */
+    private const string RECORDING_PROGRAM = "#!/bin/bash\n".self::HANDLER."\ncommand_not_found_handle \"\$0\" \"\$@\"\n";
 
     private const array PROGRAMS = ['make', 'rm', 'p', 'q', 'npm', 'php'];
 
@@ -121,6 +131,7 @@ final class ShellParserFuzzTest extends TestCase
     {
         yield 'both branches of a condition' => ["test '' && make a || make b", [['make', 'a'], ['make', 'b']]];
         yield 'a command that succeeds, then one that fails' => ['p && { q || make a; }', [['q'], ['make', 'a']]];
+        yield 'a program named by its path' => ['bin/console a && make b || make c', [['bin/console', 'a'], ['make', 'b'], ['make', 'c']]];
     }
 
     /**
@@ -189,6 +200,8 @@ final class ShellParserFuzzTest extends TestCase
         $this->filesystem->remove(self::DIRECTORY);
         $log = self::DIRECTORY.'/commands.log';
         $this->filesystem->dumpFile($log, '');
+        $this->filesystem->dumpFile(self::DIRECTORY.'/bin/console', self::RECORDING_PROGRAM);
+        $this->filesystem->chmod(self::DIRECTORY.'/bin/console', 0o755);
         $process = new Process(['bash', '-c', self::RECORDER."\n".$line], self::DIRECTORY, ['AIRLOCK_FUZZ_LOG' => $log, 'AIRLOCK_FUZZ_SALT' => (string) $salt], timeout: 10);
         $process->run();
 
