@@ -30,14 +30,15 @@ final class ShellParserFuzzTest extends TestCase
     private const int LINES_PER_SEED = 250;
 
     /**
-     * bash runs this handler for every program it cannot find, and none can be found: it writes the words it was given, in one write so that commands running at once do not mix theirs.
+     * bash runs this handler for every program it cannot find, and none can be found, builtins turned off but the
+     * handler's own: it writes the words it was given, in one write so that commands running at once do not mix theirs.
      */
     private const string RECORDER = <<<'BASH'
         command_not_found_handle() { local record; printf -v record '%s\037' "$@"; printf '%s\036' "$record" >> "$AIRLOCK_FUZZ_LOG"; return 0; }
         PATH=/nonexistent
+        for builtin in $(compgen -b); do case $builtin in enable|local|printf|return) ;; *) enable -n "$builtin" ;; esac; done
         BASH;
 
-    /** Programs no shell has built in, so each one reaches the recorder. */
     private const array PROGRAMS = ['make', 'rm', 'p', 'q', 'npm', 'php'];
 
     private const array WORDS = [
@@ -100,11 +101,17 @@ final class ShellParserFuzzTest extends TestCase
     }
 
     /**
-     * Whether a word of the line holds an expansion, which the words joined at random can write unescaped.
+     * Whether a word of the line holds an expansion, which the words joined at random can write unescaped. A bare `{`
+     * expands nothing: it opens a group, or is a word like any other.
      */
     private function expands(string $line): bool
     {
-        return array_any(new Lexer($line)->tokens(), static fn (Token $token): bool => !$token->isLiteral);
+        return array_any(new Lexer($line)->tokens(), static fn (Token $token): bool => !$token->isLiteral && !self::isBareBrace($token));
+    }
+
+    private static function isBareBrace(Token $token): bool
+    {
+        return '{' === $token->text && !$token->isQuoted();
     }
 
     private function randomLine(Randomizer $randomizer): string
