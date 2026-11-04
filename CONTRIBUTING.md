@@ -7,7 +7,7 @@ For a change bigger than a fix, open an issue first, so that we agree on it befo
 ## Setting up
 
 You need PHP 8.5 with the extensions `composer.json` requires, Composer, and on Linux bubblewrap
-(`apt install bubblewrap`). Then:
+(`sudo apt-get install -y bubblewrap`). Then:
 
 ```bash
 git clone https://github.com/hbenabdallah/airlock.git && cd airlock
@@ -15,13 +15,14 @@ composer install
 composer check
 ```
 
-`composer check` runs what CI runs: PHP CS Fixer, Rector, PHPStan at its highest level with strict rules, and
-PHPUnit. The tests never reach the network. On Ubuntu 24.04, bubblewrap needs
+`composer check` runs the code checks: PHP CS Fixer, Rector, PHPStan at its highest level with strict rules, and
+PHPUnit. The tests never reach the network. CI also runs `composer validate --strict`, `composer audit`, and smoke
+tests that send a command through the server, the Docker image and the binaries. On Ubuntu 24.04, bubblewrap needs
 `sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0`; in a container, it needs
 `--security-opt seccomp=unconfined --security-opt apparmor=unconfined --security-opt systempaths=unconfined`.
 
-Run the server from the clone with `php bin/console mcp:server`, and connect a client to it with
-`php bin/console connect <client>`.
+To try a change in a client, run `php bin/console connect <client>` from the clone: the client then starts
+`php bin/console mcp:server` itself, over stdio.
 
 ## Making a change
 
@@ -33,8 +34,7 @@ Run the server from the clone with `php bin/console mcp:server`, and connect a c
   add a PHPStan baseline or an ignore: fix the code.
 - Try the change in a real client before opening the pull request, and say in it how you did.
 
-[AGENTS.md](AGENTS.md) and [PHP-RULES.md](PHP-RULES.md) hold the conventions in full, for people and coding agents
-alike. [docs/design.md](docs/design.md) explains how Airlock works.
+[AGENTS.md](AGENTS.md) holds the conventions in full, the PHP rules included, for people and coding agents alike. [docs/design.md](docs/design.md) explains how Airlock works.
 
 ## License
 
