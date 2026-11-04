@@ -87,6 +87,42 @@ final class ProjectGrantsTest extends TestCase
         self::assertCount(1, $this->grants()->all());
     }
 
+    public function testARevokedGrantIsGoneAndTheOthersStay(): void
+    {
+        $this->grants()->add([new Grant(['make', 'test'], true), new Grant(['ls', '-la'], false)]);
+
+        $this->grants()->revoke([new Grant(['make', 'test'], true)]);
+
+        self::assertEquals([new Grant(['ls', '-la'], false)], $this->grants()->all());
+    }
+
+    public function testRevokingTheLastGrantLeavesNone(): void
+    {
+        $this->grants()->add([new Grant(['ls'], false)]);
+
+        $this->grants()->revoke([new Grant(['ls'], false)]);
+
+        self::assertSame([], $this->grants()->all());
+    }
+
+    public function testRevokingAGrantNotThereChangesNothing(): void
+    {
+        $this->grants()->add([new Grant(['ls'], false)]);
+
+        $this->grants()->revoke([new Grant(['ls'], true)]);
+
+        self::assertEquals([new Grant(['ls'], false)], $this->grants()->all(), 'A grant is revoked as it was given: `ls …` is not `ls`.');
+    }
+
+    public function testRevokingKeepsTheFilePrivate(): void
+    {
+        $this->grants()->add([new Grant(['ls'], false), new Grant(['pwd'], false)]);
+
+        $this->grants()->revoke([new Grant(['ls'], false)]);
+
+        self::assertSame(0o600, fileperms($this->configDirectory->forProject($this->project->path).'/grants.yaml') & 0o777);
+    }
+
     public function testGrantsAreKeptPerProject(): void
     {
         $this->grants()->add([new Grant(['make', 'test'], true)]);

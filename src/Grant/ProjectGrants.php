@@ -48,18 +48,48 @@ final readonly class ProjectGrants
 
     /**
      * @param list<Grant> $grants
+     *
+     * @throws InvalidGrantsException when the file cannot be read: it is never guessed at
      */
     public function add(array $grants): void
     {
-        $lock = $this->lockFactory->createLock('airlock-grants-'.hash('sha256', $this->file()));
-        $lock->acquire(blocking: true);
-        try {
-            $kept = $this->all();
+        $this->update(static function (array $kept) use ($grants): array {
             foreach ($grants as $grant) {
                 if (!array_any($kept, $grant->equals(...))) {
                     $kept[] = $grant;
                 }
             }
+
+            return $kept;
+        });
+    }
+
+    /**
+     * Each grant goes as it was given: revoking `ls` leaves `ls …`.
+     *
+     * @param list<Grant> $grants
+     *
+     * @throws InvalidGrantsException when the file cannot be read: it is never guessed at
+     */
+    public function revoke(array $grants): void
+    {
+        $this->update(static fn (array $kept): array => array_values(array_filter(
+            $kept,
+            static fn (Grant $grant): bool => !array_any($grants, $grant->equals(...)),
+        )));
+    }
+
+    /**
+     * @param \Closure(list<Grant>): list<Grant> $change
+     *
+     * @throws InvalidGrantsException
+     */
+    private function update(\Closure $change): void
+    {
+        $lock = $this->lockFactory->createLock('airlock-grants-'.hash('sha256', $this->file()));
+        $lock->acquire(blocking: true);
+        try {
+            $kept = $change($this->all());
             $this->writePrivately(Yaml::dump(['grants' => array_map($this->normalize(...), $kept)], 3));
         } finally {
             $lock->release();
