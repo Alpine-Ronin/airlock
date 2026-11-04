@@ -143,6 +143,14 @@ binary per platform.
 Next, in this order:
 
 - Cursor and VS Code run end to end, as the others were.
+- GitHub actions Airlock runs itself, outside the sandbox, with the user's
+  existing `gh` login: open a pull request, read its checks, read its review
+  comments. A command never gets a token it could copy, so `gh` cannot run
+  inside the sandbox; these tools give the agent what it needs without one.
+  Opening a pull request goes through the form like any command; checks and
+  comments are read without asking, but come back as an output does: checked
+  for injection, marked as data, secrets masked. Only GitHub, only these
+  actions: any other service keeps the rule that its commands are the user's.
 - Releases that prove where they come from (build provenance, an SBOM, a
   signed and notarized macOS binary) and a parser fuzzed against grants that
   cover more than they say.
