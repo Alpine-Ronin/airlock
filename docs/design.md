@@ -135,17 +135,14 @@ written under a `symfony/lock` lock: two agents can share one Airlock.
 ## Status and roadmap
 
 Done: the parser, the policy, both sandboxes, the form and its grants, the
-audit log, the model checks, `airlock connect` for five clients, and a static
+audit log, rotated past a size, the model checks, `airlock connect` for five
+clients, three of them run end to end, grants and recent decisions from the
+terminal (`airlock grants`, `airlock log`), `airlock doctor`, and a static
 binary per platform.
 
 Next, in this order:
 
-- Every client `connect` writes for, run end to end, and a table saying what
-  works in each.
-- Grants and the audit log managed from the terminal: list and revoke grants,
-  read recent decisions; and the log rotated past a size.
-- `airlock doctor`: the sandbox, the connected clients, the models and the
-  file permissions checked in one command, each problem with its fix.
+- Cursor and VS Code run end to end, as the others were.
 - Releases that prove where they come from (build provenance, an SBOM, a
   signed and notarized macOS binary) and a parser fuzzed against grants that
   cover more than they say.
