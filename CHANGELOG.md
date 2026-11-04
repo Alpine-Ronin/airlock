@@ -7,8 +7,11 @@ minor version may change the configuration and file formats.
 
 ### Fixed
 
+- `airlock doctor` said a client was connected to no Airlock when it starts another one, such as an earlier install,
+  and said nothing when the client starts this Airlock with its own shell tool back on: it now names both, the second
+  as a problem (#38).
 - A command lent the SSH agent, such as `git push` over SSH, could not check the server's host key, so ssh refused to
-  connect: it now reads `~/.ssh/known_hosts`, read-only. The keys and the rest of `~/.ssh` stay hidden.
+  connect: it now reads `~/.ssh/known_hosts`, read-only. The keys and the rest of `~/.ssh` stay hidden (#39).
 
 ## 0.3.0 (2026-11-04)
 
