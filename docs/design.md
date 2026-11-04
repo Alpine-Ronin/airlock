@@ -132,12 +132,21 @@ written under a `symfony/lock` lock: two agents can share one Airlock.
 - Replacing the client's own approvals: Airlock adds a layer every client
   shares; a client may still ask before calling it.
 
-## Milestones (to 22 November 2026, 18:00 CET)
+## Status and roadmap
 
-| Dates | What | Done when |
-|---|---|---|
-| 1–4 Nov | Parser, policy, sandbox, `run_command` | a command runs sandboxed, and the dangerous ones are recognised, under test |
-| 5–8 Nov | The form: once / session / always / refuse, signed state, grants, audit log | approved, refused and replayed answers behave, in both protocol eras, and in Claude Code |
-| 9–12 Nov | Symfony AI: output classification, risk in plain words, fallbacks | an injected README is flagged in a real session; works with no token |
-| 13–16 Nov | CI, README from `git clone` to a running demo in five minutes | a stranger's clone works |
-| 17–20 Nov | The 90-second video, polish, repository made public | submitted, with two days to spare |
+Done: the parser, the policy, both sandboxes, the form and its grants, the
+audit log, the model checks, `airlock connect` for five clients, and a static
+binary per platform.
+
+Next, in this order:
+
+- Every client `connect` writes for, run end to end, and a table saying what
+  works in each.
+- Grants and the audit log managed from the terminal: list and revoke grants,
+  read recent decisions; and the log rotated past a size.
+- `airlock doctor`: the sandbox, the connected clients, the models and the
+  file permissions checked in one command, each problem with its fix.
+- Releases that prove where they come from (build provenance, an SBOM, a
+  signed and notarized macOS binary) and a parser fuzzed against grants that
+  cover more than they say.
+- 1.0: the policy, grants and audit formats documented and kept stable.
