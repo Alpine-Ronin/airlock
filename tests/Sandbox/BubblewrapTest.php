@@ -345,6 +345,6 @@ final class BubblewrapTest extends TestCase
         $home = $this->root.'/home';
         $paths = new SandboxPaths($home, $this->root.'/airlock', new ConfigDirectory($home), $this->root.'/run');
 
-        return new SandboxDetector($paths, $mode);
+        return new SandboxDetector($paths, new ProjectDirectory($this->root.'/project'), $mode);
     }
 }

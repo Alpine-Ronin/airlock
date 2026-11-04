@@ -96,6 +96,29 @@ final readonly class SandboxPaths
     }
 
     /**
+     * The first key store or Airlock file the project holds, existing or not, or null when it holds none. A sandbox
+     * lets a command write anywhere in the project, so it cannot keep these out of reach there: a command could
+     * create a missing `~/.ssh/config`, or rename the directory above a hidden one and write in it.
+     */
+    public function heldBy(string $projectDirectory): ?string
+    {
+        $home = realpath($this->home);
+        $home = false === $home ? $this->home : $home;
+        $configDirectory = realpath($this->configDirectory->path);
+        $candidates = [false === $configDirectory ? $this->configDirectory->path : $configDirectory];
+        foreach (self::KEYS as $key) {
+            $candidates[] = $home.'/'.$key;
+        }
+        foreach ($candidates as $candidate) {
+            if ($candidate === $projectDirectory || str_starts_with($candidate, rtrim($projectDirectory, '/').'/')) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * The user's known hosts, for a command lent the SSH agent: without them ssh cannot tell the real server from
      * one pretending to be it, and refuses to connect. They hold servers' public keys, nothing secret, and stay
      * read-only so that a command cannot vouch for a forged one. Null when there are none.
