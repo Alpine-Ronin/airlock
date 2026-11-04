@@ -12,6 +12,7 @@ minor version may change the configuration and file formats.
   as `ls` with a variable set, though bash runs a program named `A=1`. Airlock now reads grouping words, assignments,
   a final backslash and quoted numbers before a redirection as bash does, and a test compares what it reads with what
   bash runs over a thousand random lines on every run.
+- Symfony is updated to 8.1.11, for the security fixes it published on 4 November 2026.
 
 ## 0.3.1 (2026-11-04)
 
