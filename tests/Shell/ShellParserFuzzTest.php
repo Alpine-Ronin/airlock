@@ -31,14 +31,27 @@ final class ShellParserFuzzTest extends TestCase
 
     /**
      * bash runs this handler for every program it cannot find, and none can be found, builtins turned off but the
-     * handler's own: it writes the words it was given, in one write so that commands running at once do not mix theirs,
-     * and exits with the status the run gives every command, so that each run takes one branch of `&&` and `||`.
+     * handler's own: it writes the words it was given, in one write so that commands running at once do not mix theirs.
+     * It fails or succeeds by a hash of those words and the run's salt: each run takes other branches of `&&` and `||`,
+     * the same ones every time, and a counter would not do, as subshells and pipes cannot share one.
      */
     private const string RECORDER = <<<'BASH'
-        command_not_found_handle() { local record; printf -v record '%s\037' "$@"; printf '%s\036' "$record" >> "$AIRLOCK_FUZZ_LOG"; return "$AIRLOCK_FUZZ_STATUS"; }
+        command_not_found_handle() {
+            local record character hash=$AIRLOCK_FUZZ_SALT index
+            printf -v record '%s\037' "$@"
+            printf '%s\036' "$record" >> "$AIRLOCK_FUZZ_LOG"
+            for ((index = 0; index < ${#record}; index++)); do
+                printf -v character '%d' "'${record:index:1}"
+                hash=$(( (hash * 31 + character) % 1000003 ))
+            done
+            return $(( hash & 1 ))
+        }
         PATH=/nonexistent
         for builtin in $(compgen -b); do case $builtin in enable|local|printf|return) ;; *) enable -n "$builtin" ;; esac; done
         BASH;
+
+    /** Each line runs once per salt: enough for every branch of the conditions below to run in one of them. */
+    private const array SALTS = [1, 2, 3, 4];
 
     private const array PROGRAMS = ['make', 'rm', 'p', 'q', 'npm', 'php'];
 
@@ -95,9 +108,31 @@ final class ShellParserFuzzTest extends TestCase
             }
             $read = array_map(static fn (SimpleCommand $command): array => $command->programWords(), $parsed->commands);
 
-            foreach ([...$this->commandsBashRuns($line, status: 0), ...$this->commandsBashRuns($line, status: 1)] as $ran) {
+            foreach ($this->commandsBashRunsOverTheSalts($line) as $ran) {
                 self::assertContains($ran, $read, \sprintf('bash runs %s, which the parser did not read in the line %s (seed %d). It read: %s', json_encode($ran), json_encode($line), $seed, json_encode($read)));
             }
+        }
+    }
+
+    /**
+     * @return iterable<string, array{string, list<list<string>>}>
+     */
+    public static function conditions(): iterable
+    {
+        yield 'both branches of a condition' => ["test '' && make a || make b", [['make', 'a'], ['make', 'b']]];
+        yield 'a command that succeeds, then one that fails' => ['p && { q || make a; }', [['q'], ['make', 'a']]];
+    }
+
+    /**
+     * @param list<list<string>> $expected
+     */
+    #[DataProvider('conditions')]
+    public function testEveryBranchRunsInOneOfTheSalts(string $line, array $expected): void
+    {
+        $ran = $this->commandsBashRunsOverTheSalts($line);
+
+        foreach ($expected as $command) {
+            self::assertContains($command, $ran, 'A command behind a condition is compared only if one of the runs reaches it.');
         }
     }
 
@@ -113,14 +148,6 @@ final class ShellParserFuzzTest extends TestCase
     private static function isBareBrace(Token $token): bool
     {
         return '{' === $token->text && !$token->isQuoted();
-    }
-
-    public function testEachBranchOfAConditionRunsOnce(): void
-    {
-        $line = "test '' && rm a || rm b";
-
-        self::assertSame([['test', ''], ['rm', 'a']], $this->commandsBashRuns($line, status: 0));
-        self::assertSame([['test', ''], ['rm', 'b']], $this->commandsBashRuns($line, status: 1), 'The commands after a failing one are compared too.');
     }
 
     private function randomLine(Randomizer $randomizer): string
@@ -144,12 +171,25 @@ final class ShellParserFuzzTest extends TestCase
     /**
      * @return list<list<string>>
      */
-    private function commandsBashRuns(string $line, int $status): array
+    private function commandsBashRunsOverTheSalts(string $line): array
+    {
+        $commands = [];
+        foreach (self::SALTS as $salt) {
+            $commands = [...$commands, ...$this->commandsBashRuns($line, $salt)];
+        }
+
+        return $commands;
+    }
+
+    /**
+     * @return list<list<string>>
+     */
+    private function commandsBashRuns(string $line, int $salt): array
     {
         $this->filesystem->remove(self::DIRECTORY);
         $log = self::DIRECTORY.'/commands.log';
         $this->filesystem->dumpFile($log, '');
-        $process = new Process(['bash', '-c', self::RECORDER."\n".$line], self::DIRECTORY, ['AIRLOCK_FUZZ_LOG' => $log, 'AIRLOCK_FUZZ_STATUS' => (string) $status], timeout: 10);
+        $process = new Process(['bash', '-c', self::RECORDER."\n".$line], self::DIRECTORY, ['AIRLOCK_FUZZ_LOG' => $log, 'AIRLOCK_FUZZ_SALT' => (string) $salt], timeout: 10);
         $process->run();
 
         $commands = [];
