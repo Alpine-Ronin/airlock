@@ -322,6 +322,11 @@ refuse:
 
 ## Troubleshooting
 
+Start with `airlock doctor`, from the project. It looks at the sandbox, the model checks, the policy and grants
+files, who else can open Airlock's files, and which clients are connected, then says what to do about each. It
+changes nothing, reaches no network, and fails only on a problem that stops Airlock from protecting you. Paste its
+output in a bug report.
+
 - **"No sandbox (bubblewrap cannot start here …)"**: bubblewrap is missing or may not create namespaces. Install it;
   on Ubuntu, allow unprivileged user namespaces as above. In Docker, keep the three `--security-opt` and run as a
   non-root user (`-u`): as root, bubblewrap does not create the user namespace it needs. Until it works, Airlock

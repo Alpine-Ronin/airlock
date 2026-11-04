@@ -19,8 +19,8 @@ final readonly class ConfigDirectory
         #[Autowire(env: 'default::XDG_CONFIG_HOME')]
         ?string $configHome = null,
     ) {
-        $base = null === $configHome || '' === $configHome ? $home.'/.config' : $configHome;
-        $this->path = $base.'/airlock';
+        $base = null === $configHome || '' === $configHome ? rtrim($home, '/').'/.config' : $configHome;
+        $this->path = rtrim($base, '/').'/airlock';
     }
 
     /**

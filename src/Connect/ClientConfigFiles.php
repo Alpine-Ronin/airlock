@@ -172,9 +172,9 @@ final readonly class ClientConfigFiles
         if (!is_file($path)) {
             throw new UnsupportedConfigException('it is not a file');
         }
-        $content = file_get_contents($path);
+        $content = is_readable($path) ? file_get_contents($path) : false;
         if (false === $content) {
-            throw new \RuntimeException(\sprintf('Airlock cannot read %s.', $path));
+            throw new UnsupportedConfigException('it cannot be read');
         }
 
         return $content;

@@ -55,6 +55,13 @@ final class ModelSettingsFileTest extends TestCase
         self::assertSame(0o600, fileperms($this->file->path()) & 0o777);
     }
 
+    public function testAirlocksDirectoryIsCreatedOpenToItsOwnerOnly(): void
+    {
+        $this->file->write(new ModelSettings('https://models.example.test', 'secret-key'));
+
+        self::assertSame(0o700, fileperms(\dirname($this->file->path())) & 0o777, 'The first file Airlock writes creates its directory: it must be as closed as the audit log and the grants make it.');
+    }
+
     /**
      * @return iterable<string, array{string}>
      */
@@ -73,5 +80,18 @@ final class ModelSettingsFileTest extends TestCase
         $this->expectException(InvalidModelSettingsException::class);
 
         $this->file->read();
+    }
+
+    public function testAKeyInAFileThatIsNotYamlIsNotRepeatedInTheError(): void
+    {
+        $this->filesystem->dumpFile($this->file->path(), "base_url: https://models.example.test\napi_key: sk-secret-1234: x\n");
+
+        try {
+            $this->file->read();
+            self::fail('A file that is not YAML is refused.');
+        } catch (InvalidModelSettingsException $e) {
+            self::assertStringNotContainsString('sk-secret', $e->getMessage(), 'The message is shown by airlock doctor and logged: it must not carry the key.');
+            self::assertStringContainsString('models.yaml is not valid YAML', $e->getMessage());
+        }
     }
 }
