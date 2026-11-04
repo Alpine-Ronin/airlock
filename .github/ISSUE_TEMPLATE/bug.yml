@@ -1,0 +1,49 @@
+name: Bug
+description: Airlock did something it should not, or did not do what the README says.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: 'A way around Airlock is a vulnerability: report it privately, as SECURITY.md says, not here.'
+  - type: input
+    id: version
+    attributes:
+      label: Airlock version
+      description: What `airlock --version` prints, or `git rev-parse HEAD` in the clone when you run it from source or Docker.
+      placeholder: 'Airlock v0.2.6 (env: prod, debug: false)'
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: System
+      placeholder: Ubuntu 24.04, x86_64
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: MCP client and its version
+      placeholder: Claude Code 2.1.318
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: What you did
+      description: The shortest steps that show it, with the command the agent ran.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: What the form, the agent or `airlock log` showed. Mask anything secret.
+    validations:
+      required: true
