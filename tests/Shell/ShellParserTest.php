@@ -51,6 +51,34 @@ final class ShellParserTest extends TestCase
         yield 'a redirection before the program' => ['> out.txt echo hi', [['echo', 'hi']]];
         yield 'nothing but a comment runs nothing' => ['   # nothing', []];
         yield 'a double semicolon ends a command' => ['a;; b', [['a'], ['b']]];
+        yield 'groups inside groups' => ['{ { ls; } }', [['ls']]];
+        yield 'a closing brace after a word is a word' => ['ls -l }', [['ls', '-l', '}']]];
+        yield 'a negation after a redirection is a program' => ['> out ! ls', [['!', 'ls']]];
+        yield 'a quoted brace is a program' => ["'{' ls; \\{ ls", [['{', 'ls'], ['{', 'ls']]];
+        yield 'a backslash that ends the line is kept' => ['ls -la\\', [['ls', '-la\\']]];
+        yield 'a quoted number before a redirection is a word' => ["ls ''2>&1", [['ls', '2']]];
+    }
+
+    /**
+     * @param list<string> $expected
+     */
+    #[DataProvider('programWords')]
+    public function testTheProgramComesAfterTheVariablesSetForIt(string $line, array $expected): void
+    {
+        self::assertSame($expected, new ShellParser()->parse($line)->commands[0]->programWords());
+    }
+
+    /**
+     * @return iterable<string, array{string, list<string>}>
+     */
+    public static function programWords(): iterable
+    {
+        yield 'a variable set for the command' => ['APP_ENV=test php x', ['php', 'x']];
+        yield 'a quoted value' => ["A='a b' B+=\"c\" ls", ['ls']];
+        yield 'a quoted name is the program' => ["''A=1 ls", ['A=1', 'ls']];
+        yield 'a name quoted in its middle is the program' => ['a"b"=1 ls', ['ab=1', 'ls']];
+        yield 'an escaped equals sign is the program' => ['A\=1 ls', ['A=1', 'ls']];
+        yield 'an assignment after the program is an argument' => ['make A=1', ['make', 'A=1']];
     }
 
     public function testAPipeIsRecordedOnTheCommandThatReadsIt(): void

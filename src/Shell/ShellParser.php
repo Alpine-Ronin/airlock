@@ -40,6 +40,9 @@ final class ShellParser
                 $pendingOperator = null;
                 continue;
             }
+            if (TokenType::Word === $token->type && [] === $words && [] === $redirections && $this->isGrouping($token)) {
+                continue;
+            }
             if (TokenType::Word === $token->type) {
                 $words[] = $token;
                 continue;
@@ -76,9 +79,13 @@ final class ShellParser
      */
     private function command(array $words, array $redirections, bool $readsPipe): SimpleCommand
     {
-        $texts = array_map(static fn (Token $word): string => $word->text, $this->withoutGrouping($words));
+        $texts = array_map(static fn (Token $word): string => $word->text, $words);
+        $assignments = 0;
+        while ($assignments < \count($words) && $words[$assignments]->isAssignment()) {
+            ++$assignments;
+        }
 
-        return new SimpleCommand($texts, $redirections, $readsPipe);
+        return new SimpleCommand($texts, $redirections, $readsPipe, $assignments);
     }
 
     /**
@@ -111,16 +118,24 @@ final class ShellParser
     {
         $programs = [];
         $isCommandStart = true;
+        $isOpening = true;
         $isRedirectionTarget = false;
         foreach ($tokens as $token) {
             if (TokenType::Word !== $token->type) {
                 $isRedirectionTarget = TokenType::Redirection === $token->type;
                 $isCommandStart = $isCommandStart || !$isRedirectionTarget;
+                $isOpening = !$isRedirectionTarget;
                 continue;
             }
-            $isSkipped = $isRedirectionTarget || \in_array($token->text, self::GROUPING_WORDS, true) || SimpleCommand::isAssignment($token->text);
-            $isRedirectionTarget = false;
-            if (!$isCommandStart || $isSkipped) {
+            if ($isRedirectionTarget) {
+                $isRedirectionTarget = false;
+                continue;
+            }
+            if ($isOpening && $this->isGrouping($token)) {
+                continue;
+            }
+            $isOpening = false;
+            if (!$isCommandStart || $token->isAssignment()) {
                 continue;
             }
             $programs[] = $token;
@@ -131,19 +146,11 @@ final class ShellParser
     }
 
     /**
-     * @param list<Token> $words
-     *
-     * @return list<Token>
+     * Whether a word groups or negates the command it opens. bash reads `{`, `}` and `!` so only unquoted and before any
+     * other word or redirection of the command: anywhere else they are words like the others.
      */
-    private function withoutGrouping(array $words): array
+    private function isGrouping(Token $word): bool
     {
-        while ([] !== $words && \in_array($words[0]->text, self::GROUPING_WORDS, true)) {
-            array_shift($words);
-        }
-        while ([] !== $words && '}' === $words[\count($words) - 1]->text) {
-            array_pop($words);
-        }
-
-        return $words;
+        return !$word->isQuoted() && \in_array($word->text, self::GROUPING_WORDS, true);
     }
 }

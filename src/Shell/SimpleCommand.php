@@ -13,11 +13,13 @@ final readonly class SimpleCommand
      * @param list<string>      $words        the program and its arguments, unquoted, variable assignments first
      * @param list<Redirection> $redirections
      * @param bool              $readsPipe    whether its input is the output of the command before it
+     * @param int               $assignments  how many of the first words set a variable for the command
      */
     public function __construct(
         public array $words,
         public array $redirections = [],
         public bool $readsPipe = false,
+        public int $assignments = 0,
     ) {
     }
 
@@ -28,16 +30,6 @@ final readonly class SimpleCommand
      */
     public function programWords(): array
     {
-        $words = $this->words;
-        while ([] !== $words && self::isAssignment($words[0])) {
-            array_shift($words);
-        }
-
-        return $words;
-    }
-
-    public static function isAssignment(string $word): bool
-    {
-        return 1 === preg_match('/^[A-Za-z_][A-Za-z0-9_]*\+?=/', $word);
+        return \array_slice($this->words, $this->assignments);
     }
 }
