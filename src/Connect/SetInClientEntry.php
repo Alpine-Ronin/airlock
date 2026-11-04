@@ -82,7 +82,8 @@ final readonly class SetInClientEntry implements ConfigChange
         if (\count($entries) !== \count($otherEntries)) {
             return false;
         }
-        return array_all($entries, fn($value, $key): bool => \array_key_exists($key, $otherEntries) && $this->isSameValue($value, $otherEntries[$key]));
+
+        return array_all($entries, fn ($value, $key): bool => \array_key_exists($key, $otherEntries) && $this->isSameValue($value, $otherEntries[$key]));
     }
 
     private function isSameValue(mixed $value, mixed $other): bool
