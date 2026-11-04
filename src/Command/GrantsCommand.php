@@ -130,7 +130,7 @@ final class GrantsCommand extends Command
     {
         $rows = [];
         foreach ($grants as $number => $grant) {
-            $rows[] = [(string) $number, $grant->describe()];
+            $rows[] = [(string) $number, TerminalText::of($grant->describe())];
         }
         $io->table(['#', 'Command'], $rows);
     }

@@ -73,6 +73,17 @@ final class GrantsCommandTest extends KernelTestCase
         self::assertStringContainsString('--revoke', $tester->getDisplay());
     }
 
+    public function testAGrantCannotWriteToTheTerminalItIsListedIn(): void
+    {
+        $this->grants()->add([new Grant(['echo', "\e[2J", '<error>fake</error>'], false)]);
+        $tester = $this->tester();
+
+        $tester->execute([], ['decorated' => true]);
+
+        self::assertStringNotContainsString("\e[2J", $tester->getDisplay(), 'An agent wrote the command: it must not clear the screen of the terminal listing it.');
+        self::assertStringContainsString('<error>fake</error>', $tester->getDisplay());
+    }
+
     public function testARevokedGrantIsGoneAndTheOthersStay(): void
     {
         $this->grants()->add([new Grant(['make', 'test'], true), new Grant(['ls', '-la'], false)]);

@@ -79,7 +79,7 @@ final class LogCommand extends Command
 
         return [
             $this->when($entry['at'] ?? null),
-            mb_strimwidth(\is_string($entry['command'] ?? null) ? $entry['command'] : '?', 0, self::COMMAND_WIDTH, '…'),
+            TerminalText::shortened(\is_string($entry['command'] ?? null) ? $entry['command'] : '?', self::COMMAND_WIDTH),
             $this->decision($entry['outcome'] ?? null),
             $this->output($entry['output_check'] ?? null, $entry['output_check_reason'] ?? null),
         ];
@@ -92,7 +92,7 @@ final class LogCommand extends Command
         }
         $time = \DateTimeImmutable::createFromFormat(\DATE_ATOM, $at);
 
-        return false === $time ? $at : $time->format('Y-m-d H:i');
+        return false === $time ? TerminalText::of($at) : $time->format('Y-m-d H:i');
     }
 
     private function decision(mixed $outcome): string

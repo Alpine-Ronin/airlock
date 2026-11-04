@@ -115,6 +115,18 @@ final class LogCommandTest extends KernelTestCase
         self::assertStringNotContainsString(str_repeat('a', 100), $tester->getDisplay());
     }
 
+    public function testACommandCannotWriteToTheTerminalItIsShownIn(): void
+    {
+        $this->append("echo \e[2J\e]0;owned\x07 <error>fake</error>", Verdict::Plain, Outcome::RanOnce, OutputCheck::clean(), '10:00');
+        $tester = $this->tester();
+
+        $tester->execute([], ['decorated' => true]);
+
+        self::assertStringNotContainsString("\e[2J", $tester->getDisplay(), 'An agent writes the commands: it must not clear the screen or set the title of the terminal reading them.');
+        self::assertStringNotContainsString("\x07", $tester->getDisplay());
+        self::assertStringContainsString('<error>fake</error>', $tester->getDisplay(), 'A tag in a command is shown as it is, not styled.');
+    }
+
     public function testACountThatIsNotAPositiveNumberIsRefused(): void
     {
         $tester = $this->tester();
