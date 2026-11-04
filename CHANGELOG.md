@@ -22,6 +22,8 @@ minor version may change the configuration and file formats.
   them, now runs without a sandbox, so that every command is asked: there, a command could create a missing
   `~/.ssh/config` or Airlock's `.env.local`, change Airlock's own code, or rename the directory above a hidden one, on
   Linux and macOS alike. `airlock doctor` and the form say so (#39).
+- Without a sandbox, a command covered by a grant ran without asking, with all the user's permissions. Every command
+  is now asked when there is no sandbox, as the documentation said (#39).
 
 ## 0.3.0 (2026-11-04)
 
