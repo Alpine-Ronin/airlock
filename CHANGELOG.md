@@ -9,6 +9,12 @@ minor version may change the configuration and file formats.
 
 - `airlock grants` lists the commands allowed always in the project, and `--revoke` takes them back (#33).
 - `airlock log` shows the project's last decisions in plain words (#33).
+- `airlock doctor` says whether Airlock can protect the project, and what to do when it cannot.
+
+### Fixed
+
+- `airlock configure`, run before anything else, created Airlock's directory open to others; it is now open to its
+  owner only, as the rest of Airlock makes it.
 
 ### Security
 

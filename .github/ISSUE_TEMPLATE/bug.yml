@@ -47,3 +47,9 @@ body:
       description: What the form, the agent or `airlock log` showed. Mask anything secret.
     validations:
       required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: What airlock doctor says
+      description: Run it from the project. It shows no key, but it shows paths and model names.
+      render: text
