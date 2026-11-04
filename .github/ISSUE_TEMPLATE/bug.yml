@@ -9,7 +9,7 @@ body:
     id: version
     attributes:
       label: Airlock version
-      description: What `airlock --version` prints.
+      description: What `airlock --version` prints, or `git rev-parse HEAD` in the clone when you run it from source or Docker.
       placeholder: 'Airlock v0.2.6 (env: prod, debug: false)'
     validations:
       required: true

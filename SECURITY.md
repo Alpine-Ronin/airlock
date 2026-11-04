@@ -6,11 +6,14 @@ in an issue.
 ## Reporting
 
 Open a private report on GitHub: [Report a vulnerability](https://github.com/hbenabdallah/airlock/security/advisories/new).
-Say which version (`airlock --version`), on which system, with which client, and the shortest steps that show it.
+Say which version (`airlock --version`, or `git rev-parse HEAD` in the clone when you run it from source or
+Docker), on which system, with which client, and the shortest steps that show it.
 You get an answer within seven days, and the fix is credited to you unless you would rather not.
 
-Only the latest release is fixed: update with the [installer](README.md#with-a-binary-no-php-no-docker) before
-reporting.
+Only the latest release is fixed: update before reporting. With a binary, run the
+[installer](README.md#with-a-binary-no-php-no-docker) again; from source, `git pull` and `composer install` in the
+clone; with Docker, `git pull` in the clone and build the image again. The installer has no Intel Mac binary: there,
+run Airlock from source or Docker.
 
 ## What counts
 
