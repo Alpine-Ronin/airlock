@@ -3,7 +3,7 @@
 What changed in each release, newest first. Versions follow [semantic versioning](https://semver.org): until 1.0, a
 minor version may change the configuration and file formats.
 
-## Unreleased
+## 0.3.0 (2026-11-04)
 
 ### Added
 
@@ -11,12 +11,16 @@ minor version may change the configuration and file formats.
 - `airlock log` shows the project's last decisions in plain words (#33).
 - `airlock doctor` says whether Airlock can protect the project, and what to do when it cannot (#35).
 - The audit log moves aside at 10 MiB, and the five last logs moved aside are kept, so it never fills the disk;
-  `airlock log` and `airlock://audit` read across them.
+  `airlock log` and `airlock://audit` read across them (#36).
+- How to report a vulnerability and what counts as one, how to contribute, and issue forms (#34).
 
 ### Fixed
 
 - `airlock configure`, run before anything else, created Airlock's directory open to others; it is now open to its
   owner only, as the rest of Airlock makes it (#35).
+- A client file Airlock cannot read is reported as one it cannot edit, instead of stopping `airlock connect` with an
+  error (#35).
+- Airlock's directory is written without a double slash when `HOME` is `/` (#35).
 
 ### Security
 
