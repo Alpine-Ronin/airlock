@@ -19,8 +19,13 @@ final class ConfigNode
             return $value;
         }
 
+        return self::table($value);
+    }
+
+    public static function table(ConfigTable $table): \stdClass
+    {
         $node = new \stdClass();
-        foreach ($value->entries as $key => $entry) {
+        foreach ($table->entries as $key => $entry) {
             $node->{$key} = self::of($entry);
         }
 

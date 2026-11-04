@@ -291,6 +291,25 @@ final class ConnectCommandTest extends KernelTestCase
         self::assertSame('stdio', RecordedResponses::at($config, 'extensions', 'airlock', 'type'));
     }
 
+    public function testAGooseNotStartedYetGetsItsDeveloperExtensionWithoutTheShell(): void
+    {
+        $this->tester()->execute(['client' => 'goose']);
+
+        $config = Yaml::parseFile(self::HOME.'/.config/goose/config.yaml');
+        self::assertSame(['write', 'edit', 'tree'], RecordedResponses::at($config, 'extensions', 'developer', 'available_tools'), 'Goose adds its developer extension, shell included, when its configuration has none.');
+        self::assertSame('platform', RecordedResponses::at($config, 'extensions', 'developer', 'type'));
+        self::assertTrue(RecordedResponses::at($config, 'extensions', 'developer', 'enabled'));
+    }
+
+    public function testRemovingFromAGooseNotStartedYetDeletesItsConfiguration(): void
+    {
+        $this->tester()->execute(['client' => 'goose']);
+
+        $this->tester()->execute(['client' => 'goose', '--remove' => true]);
+
+        self::assertDirectoryDoesNotExist(self::HOME.'/.config/goose');
+    }
+
     public function testAFileAirlockCannotEditSafelyIsLeftAsItWas(): void
     {
         $original = "{\n  // my servers\n  \"servers\": {}\n}\n";

@@ -30,6 +30,19 @@ final readonly class ConfigPath
         return $this->keys[\count($this->keys) - 1];
     }
 
+    /**
+     * @throws \LogicException for a path of one key, which has no parent
+     */
+    public function parent(): self
+    {
+        $keys = $this->parentKeys();
+        if ([] === $keys) {
+            throw new \LogicException(\sprintf('%s has no parent', $this->dotted()));
+        }
+
+        return new self($keys);
+    }
+
     public function dotted(): string
     {
         return implode('.', $this->keys);
@@ -68,7 +81,7 @@ final readonly class ConfigPath
     }
 
     /**
-     * @return list<string>
+     * @return list<non-empty-string>
      */
     private function parentKeys(): array
     {
