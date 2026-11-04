@@ -183,8 +183,18 @@ does not support it yet.
 yours. Add the `mcpServers` entry by hand, with `docker` as the command and the rest of the server command, one word
 per item, as its arguments.
 
-Tested end to end: Claude Code. The other clients follow their documented formats and have not been run with Airlock
-yet: tell us how they behave.
+Run end to end means through [the demo](#try-the-demo) in the client: the injected README flagged, `rm -rf` asked
+with only once or refuse, the audit resource read.
+
+| Client | Tested | What to expect |
+|---|---|---|
+| Claude Code | End to end | Airlock's form opens in the client; long messages are folded (`ctrl+o` unfolds them). |
+| Codex | End to end, 0.166 | Codex asks first whether Airlock's tool may run, then Airlock's form opens. An *always* grant holds after a restart; asked to run a command without Airlock, the agent has no shell to do it. |
+| Goose | End to end, 1.57 | The form shows the choices by their values (`once`, `session`, `always`, `refuse`). Asked to run a command without Airlock, the agent finds no shell, even after turning the developer extension off and on. |
+| Cursor | Not yet | `connect` follows its documented format. |
+| VS Code | Not yet | `connect` follows its documented format. |
+
+Tell us how a client behaves, tested or not.
 
 ### Optional: the model checks
 
