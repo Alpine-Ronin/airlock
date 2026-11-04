@@ -18,8 +18,8 @@ minor version may change the configuration and file formats.
 - On macOS, a command run with a project that holds the user's keys or Airlock's own files, such as the home directory,
   could write to them: they were hidden from reading only. They are now out of reach for writing too, as on Linux
   (#39).
-- A project that holds the home directory, Airlock's directory or Airlock's installation, or that sits inside one of
-  them, now runs without a sandbox, so that every command is asked: there, a command could create a missing
+- A project that holds the home directory, Airlock's directory or Airlock's installation, or that sits inside a key
+  store or Airlock's directory, now runs without a sandbox, so that every command is asked: there, a command could create a missing
   `~/.ssh/config` or Airlock's `.env.local`, change Airlock's own code, or rename the directory above a hidden one, on
   Linux and macOS alike. `airlock doctor` and the form say so (#39).
 - Without a sandbox, a command covered by a grant ran without asking, with all the user's permissions. Every command

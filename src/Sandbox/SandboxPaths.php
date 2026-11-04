@@ -99,19 +99,24 @@ final readonly class SandboxPaths
      * The first key store, Airlock directory or Airlock installation the project overlaps, existing or not, or null
      * when it overlaps none. A sandbox lets a command write anywhere in the project, so it cannot keep these out of
      * reach there: a command could create a missing `~/.ssh/config` or Airlock's `.env.local`, change Airlock's own
-     * code, or rename the directory above a hidden one and write in it. A project inside one of them would be hidden
-     * from its own commands.
+     * code, or rename the directory above a hidden one and write in it. A project inside a key store or Airlock's
+     * directory would be hidden from its own commands.
      */
     public function overlappedBy(string $projectDirectory): ?string
     {
-        $candidates = [$this->resolved($this->configDirectory->path), $this->resolved($this->airlockDirectory)];
+        // Airlock's installation is not hidden, only its secrets: a project inside it is fine.
+        $installation = $this->resolved($this->airlockDirectory);
+        if ($this->isWithin($installation, $projectDirectory)) {
+            return $installation;
+        }
+        $hiddenWhole = [$this->resolved($this->configDirectory->path)];
         $home = $this->resolved($this->home);
         foreach (self::KEYS as $key) {
-            $candidates[] = $this->resolved($home.'/'.$key);
+            $hiddenWhole[] = $this->resolved($home.'/'.$key);
         }
-        foreach ($candidates as $candidate) {
-            if ($this->isWithin($candidate, $projectDirectory) || $this->isWithin($projectDirectory, $candidate)) {
-                return $candidate;
+        foreach ($hiddenWhole as $hidden) {
+            if ($this->isWithin($hidden, $projectDirectory) || $this->isWithin($projectDirectory, $hidden)) {
+                return $hidden;
             }
         }
 

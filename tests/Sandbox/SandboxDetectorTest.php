@@ -100,6 +100,16 @@ final class SandboxDetectorTest extends TestCase
         self::assertStringContainsString(\sprintf('the project overlaps %s/keys', $home), $sandbox->describe());
     }
 
+    public function testAProjectInsideAirlocksInstallationKeepsItsSandbox(): void
+    {
+        $home = $this->home();
+        new Filesystem()->mkdir($home.'/airlock/var/project');
+
+        $sandbox = new SandboxDetector(new SandboxPaths($home, $home.'/airlock', new ConfigDirectory($home)), new ProjectDirectory($home.'/airlock/var/project'), SandboxMode::Auto, new NoExecutables(), 'Linux')->detect();
+
+        self::assertStringContainsString('bubblewrap is not installed', $sandbox->describe(), 'A command there cannot reach Airlock\'s code, which is outside the project.');
+    }
+
     public function testAProjectInsideTheHomeKeepsItsSandbox(): void
     {
         $home = $this->home();
