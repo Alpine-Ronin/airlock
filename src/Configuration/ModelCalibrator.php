@@ -12,7 +12,6 @@ use App\Risk\ModelRiskExplainer;
 use Psr\Log\NullLogger;
 use Symfony\AI\Platform\Bridge\Generic\Factory;
 use Symfony\AI\Platform\Exception\ExceptionInterface as PlatformException;
-use Symfony\AI\Platform\Exception\RateLimitExceededException;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\Component\DependencyInjection\Attribute\Target;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
@@ -67,10 +66,10 @@ final readonly class ModelCalibrator
         $explainer = new ModelRiskExplainer($platform, new NullLogger(), $modelApi, $model);
         try {
             $line = $explainer->plainWords(self::DANGEROUS_COMMAND);
-        } catch (RateLimitExceededException) {
-            return new Calibration($model, $outputCheckFailure, NotCheckedReason::RateLimited->describe(), NotCheckedReason::RateLimited);
-        } catch (PlatformException|HttpClientException) {
-            return new Calibration($model, $outputCheckFailure, NotCheckedReason::Error->describe());
+        } catch (PlatformException|HttpClientException $e) {
+            $reason = NotCheckedReason::forFailure($e);
+
+            return new Calibration($model, $outputCheckFailure, $reason->describe(), NotCheckedReason::RateLimited === $reason ? $reason : null);
         }
 
         return new Calibration($model, $outputCheckFailure, null === $line ? 'it gave no short line for a dangerous command' : null);

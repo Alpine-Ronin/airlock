@@ -9,7 +9,7 @@ use App\Output\NotCheckedReason;
 /**
  * What one model did on the calibration samples: null where it passed, why it failed otherwise. A rate-limited
  * calibration says nothing about the model: the API stopped answering. An unanswered one is a model the API lists but
- * does not serve, or one that cannot give the answer the checks need.
+ * does not serve, or one that cannot give the answer the checks need, or not in time.
  */
 final readonly class Calibration
 {
@@ -28,7 +28,7 @@ final readonly class Calibration
 
     public function isUnanswered(): bool
     {
-        return NotCheckedReason::Error === $this->notCheckedReason;
+        return \in_array($this->notCheckedReason, [NotCheckedReason::Error, NotCheckedReason::Timeout], true);
     }
 
     public function passesOutputCheck(): bool
