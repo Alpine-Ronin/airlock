@@ -187,6 +187,21 @@ final class BubblewrapTest extends TestCase
         self::assertFileDoesNotExist($common.'/hooks/pre-commit');
     }
 
+    public function testACommonDirectoryWithoutHeadKeepsItsHooksAndConfigurationWhereACommandMayWrite(): void
+    {
+        $common = $this->root.'/home/.cache/common';
+        $this->filesystem->mkdir($common);
+        new Process(['git', 'init', '-q', '--bare'], $common)->mustRun();
+        $this->filesystem->remove($common.'/HEAD');
+        $configuration = $this->filesystem->readFile($common.'/config');
+        $this->filesystem->dumpFile($this->root.'/project/.git/commondir', $common."\n");
+
+        $this->runInSandbox(\sprintf('cd %s && echo "rm -rf ~" > hooks/pre-commit; echo "[core] hooksPath = /tmp/hooks" >> config', escapeshellarg($common)));
+
+        self::assertFileDoesNotExist($common.'/hooks/pre-commit', 'Git still takes its hooks from a common directory without HEAD.');
+        self::assertSame($configuration, $this->filesystem->readFile($common.'/config'));
+    }
+
     public function testTheGitConfigurationCannotBeChanged(): void
     {
         $this->runInSandbox('echo "[core] hooksPath = /tmp/hooks" >> .git/config');
@@ -249,6 +264,17 @@ final class BubblewrapTest extends TestCase
         $this->runInSandbox(\sprintf('echo "../../../../../worktree/planted/.git" > %s', escapeshellarg($commonDirectoryFile)), project: $worktree);
 
         self::assertSame($commonDirectory, $this->filesystem->readFile($commonDirectoryFile));
+    }
+
+    public function testAWorktreesRepositoryKeepsItsHooksWhereACommandMayWriteWhenItsGitDirectoryHasNoHead(): void
+    {
+        $worktree = $this->worktreeOf($this->root.'/home/.cache/repository');
+        $this->filesystem->remove($this->root.'/home/.cache/repository/.git/worktrees/worktree/HEAD');
+        $hook = $this->root.'/home/.cache/repository/.git/hooks/pre-commit';
+
+        $this->runInSandbox(\sprintf('echo "rm -rf ~" > %s', escapeshellarg($hook)), project: $worktree);
+
+        self::assertFileDoesNotExist($hook, 'A command that stripped HEAD in an earlier run could restore it after planting the hook.');
     }
 
     public function testAWorktreesRepositoryKeepsItsConfigurationWhereACommandMayWrite(): void

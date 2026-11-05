@@ -31,7 +31,8 @@ minor version may change the configuration and file formats.
   another git directory, one of its own. `commondir` is now read-only to a command; where there is none, Airlock first
   makes one naming the git directory itself (`.`), which git reads as if there were none. The common directory an
   existing `commondir` names is kept like the git directory, and so is `config.worktree`, which git reads once
-  `extensions.worktreeConfig` is set.
+  `extensions.worktreeConfig` is set. A git directory a `.git` file or a `commondir` names stays kept even without its
+  `HEAD`: a command could otherwise remove it in one run and plant a hook there in the next.
 
 ## 0.3.5 (2026-11-05)
 
