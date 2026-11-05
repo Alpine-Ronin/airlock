@@ -28,8 +28,15 @@ enum NotCheckedReason: string
     }
 
     /**
-     * The HTTP client throws its timeout once, then a plain transport exception holding only its message each time the
-     * response is read again, which is how the model platform reads it: the message is all that is left of it.
+     * The messages a request ends with when its time is over: the HTTP client's idle timeout and total deadline, and
+     * curl's, which enforces the total deadline when it does the transfer.
+     */
+    private const array TIMEOUT_MESSAGES = ['Idle timeout reached for ', 'Max duration was reached for ', 'Operation timed out after ', 'Connection timed out after '];
+
+    /**
+     * The HTTP client throws its own timeout once, then a plain transport exception holding only its message each time
+     * the response is read again, which is how the model platform reads it; curl's timeouts arrive as transport
+     * exceptions too. The message is all that tells them apart from a model that cannot be reached.
      */
     private static function isTimeout(\Throwable $failure): bool
     {
@@ -37,7 +44,11 @@ enum NotCheckedReason: string
             return true;
         }
 
-        return $failure instanceof TransportExceptionInterface && str_starts_with($failure->getMessage(), 'Idle timeout reached for ');
+        if (!$failure instanceof TransportExceptionInterface) {
+            return false;
+        }
+
+        return array_any(self::TIMEOUT_MESSAGES, static fn (string $message): bool => str_starts_with($failure->getMessage(), $message));
     }
 
     public function describe(): string
