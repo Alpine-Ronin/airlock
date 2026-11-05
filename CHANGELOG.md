@@ -5,6 +5,12 @@ minor version may change the configuration and file formats.
 
 ## Unreleased
 
+### Added
+
+- A model whose answer did not come in time, or was lost to a server or network error, is asked once more before
+  Airlock goes on without it: `AIRLOCK_AI_RETRIES` sets how many times. A rate limit, or an answer that came but cannot
+  be used, is not asked again.
+
 ### Fixed
 
 - A model that did not answer within `AIRLOCK_AI_TIMEOUT` was reported as one that could not be reached, in the
