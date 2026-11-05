@@ -3,7 +3,7 @@
 What changed in each release, newest first. Versions follow [semantic versioning](https://semver.org): until 1.0, a
 minor version may change the configuration and file formats.
 
-## Unreleased
+## 0.3.2 (2026-11-05)
 
 ### Security
 
@@ -11,8 +11,8 @@ minor version may change the configuration and file formats.
   `ls -l ''2>&1`, `> out ! ls -l` and `'{' ls -l` all ran unasked under a grant for `ls -l`, and `''A=1 ls` was read
   as `ls` with a variable set, though bash runs a program named `A=1`. Airlock now reads grouping words, assignments,
   a final backslash and quoted numbers before a redirection as bash does, and a test compares what it reads with what
-  bash runs over a thousand random lines on every run.
-- Symfony is updated to 8.1.11, for the security fixes it published on 4 November 2026.
+  bash runs over a thousand random lines on every run (#41).
+- Symfony is updated to 8.1.11, for the security fixes it published on 4 November 2026 (#41).
 
 ## 0.3.1 (2026-11-04)
 
