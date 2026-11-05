@@ -12,6 +12,12 @@ minor version may change the configuration and file formats.
   and gives back what it read as a command's output: secrets masked, checked for prompt injection, marked as data,
   in the audit log as `read_from_github`.
 
+### Security
+
+- A command got the GitHub CLI's token when the client started Airlock with one in its environment (`GH_TOKEN`,
+  `GITHUB_TOKEN`, or their Enterprise forms): an approved command could use it or copy it. Commands no longer get
+  these variables; only Airlock's own GitHub reads use them.
+
 ## 0.3.5 (2026-11-05)
 
 ### Added
