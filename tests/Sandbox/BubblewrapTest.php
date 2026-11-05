@@ -10,6 +10,7 @@ use App\Execution\CommandRunner;
 use App\Execution\ProjectDirectory;
 use App\Output\SecretMasker;
 use App\Sandbox\Bubblewrap;
+use App\Sandbox\ReplaceableGitLinkException;
 use App\Sandbox\SandboxDetector;
 use App\Sandbox\SandboxMode;
 use App\Sandbox\SandboxPaths;
@@ -161,6 +162,47 @@ final class BubblewrapTest extends TestCase
         self::assertSame('', $this->filesystem->readFile($this->root.'/project/.git/config'));
     }
 
+    public function testAGitCommonDirectoryCannotBePlanted(): void
+    {
+        $this->runInSandbox('git init -q planted && echo "../planted/.git" > .git/commondir');
+
+        self::assertSame(".\n", $this->filesystem->readFile($this->root.'/project/.git/commondir'), 'Git would take its hooks and configuration from the planted repository.');
+    }
+
+    public function testAWorktreeConfigurationCannotBePlanted(): void
+    {
+        $this->runInSandbox('printf "[core]\n\thooksPath = /tmp/hooks\n" > .git/config.worktree');
+
+        self::assertSame('', $this->filesystem->readFile($this->root.'/project/.git/config.worktree'), 'Git reads it once extensions.worktreeConfig is set.');
+    }
+
+    public function testTheCommonDirectoryARepositoryNamesKeepsItsHooksWhereACommandMayWrite(): void
+    {
+        $common = $this->root.'/home/.cache/common';
+        $this->filesystem->mkdir($common);
+        new Process(['git', 'init', '-q', '--bare'], $common)->mustRun();
+        $this->filesystem->dumpFile($this->root.'/project/.git/commondir', $common."\n");
+
+        $this->runInSandbox(\sprintf('echo "rm -rf ~" > %s/hooks/pre-commit', escapeshellarg($common)));
+
+        self::assertFileDoesNotExist($common.'/hooks/pre-commit');
+    }
+
+    public function testACommonDirectoryWithoutHeadKeepsItsHooksAndConfigurationWhereACommandMayWrite(): void
+    {
+        $common = $this->root.'/home/.cache/common';
+        $this->filesystem->mkdir($common);
+        new Process(['git', 'init', '-q', '--bare'], $common)->mustRun();
+        $this->filesystem->remove($common.'/HEAD');
+        $configuration = $this->filesystem->readFile($common.'/config');
+        $this->filesystem->dumpFile($this->root.'/project/.git/commondir', $common."\n");
+
+        $this->runInSandbox(\sprintf('cd %s && echo "rm -rf ~" > hooks/pre-commit; echo "[core] hooksPath = /tmp/hooks" >> config', escapeshellarg($common)));
+
+        self::assertFileDoesNotExist($common.'/hooks/pre-commit', 'Git still takes its hooks from a common directory without HEAD.');
+        self::assertSame($configuration, $this->filesystem->readFile($common.'/config'));
+    }
+
     public function testTheGitConfigurationCannotBeChanged(): void
     {
         $this->runInSandbox('echo "[core] hooksPath = /tmp/hooks" >> .git/config');
@@ -173,6 +215,149 @@ final class BubblewrapTest extends TestCase
         $this->runInSandbox('touch .git/index');
 
         self::assertFileExists($this->root.'/project/.git/index');
+    }
+
+    public function testAGitDirectoryCannotBeMovedAsideForOneOfItsOwn(): void
+    {
+        $result = $this->runInSandbox('mv .git .old && git init -q && echo "rm -rf ~" > .git/hooks/pre-commit');
+
+        self::assertFalse($result->isSuccessful());
+        self::assertDirectoryDoesNotExist($this->root.'/project/.old');
+        self::assertFileDoesNotExist($this->root.'/project/.git/hooks/pre-commit');
+    }
+
+    public function testASymbolicLinkToTheHooksStopsTheCommand(): void
+    {
+        $this->filesystem->rename($this->root.'/project/.git/hooks', $this->root.'/project/hooks');
+        $this->filesystem->symlink('../hooks', $this->root.'/project/.git/hooks');
+
+        $this->expectException(ReplaceableGitLinkException::class);
+        $this->expectExceptionMessageIsOrContains($this->root.'/project/.git/hooks is a symbolic link');
+
+        $this->runInSandbox('true');
+    }
+
+    public function testASymbolicLinkToTheGitDirectoryStopsTheCommand(): void
+    {
+        $this->filesystem->rename($this->root.'/project/.git', $this->root.'/outside/.git');
+        $this->filesystem->symlink($this->root.'/outside/.git', $this->root.'/project/.git');
+
+        $this->expectException(ReplaceableGitLinkException::class);
+
+        $this->runInSandbox('true');
+    }
+
+    public function testAWorktreesGitFileCannotBeRewritten(): void
+    {
+        $worktree = $this->worktreeOf($this->root.'/repository');
+        $pointer = $this->filesystem->readFile($worktree.'/.git');
+
+        $result = $this->runInSandbox('printf "gitdir: elsewhere\n" > .git', project: $worktree);
+
+        self::assertFalse($result->isSuccessful());
+        self::assertSame($pointer, $this->filesystem->readFile($worktree.'/.git'));
+    }
+
+    public function testAGitHookCannotBePlantedThroughAWorktree(): void
+    {
+        $worktree = $this->worktreeOf($this->root.'/repository');
+
+        $this->runInSandbox('git init -q planted && echo "rm -rf ~" > planted/.git/hooks/pre-commit && printf "gitdir: planted/.git\n" > .git', project: $worktree);
+
+        self::assertFileDoesNotExist($this->gitPath($worktree, 'hooks/pre-commit'));
+    }
+
+    public function testTheGitConfigurationCannotBeChangedThroughAWorktree(): void
+    {
+        $worktree = $this->worktreeOf($this->root.'/repository');
+
+        $this->runInSandbox('git init -q planted && git -C planted config core.hooksPath /tmp/hooks && printf "gitdir: planted/.git\n" > .git', project: $worktree);
+
+        self::assertSame('', $this->gitConfig($worktree, 'core.hooksPath'));
+    }
+
+    public function testAWorktreesRepositoryKeepsItsHooksWhereACommandMayWrite(): void
+    {
+        $worktree = $this->worktreeOf($this->root.'/home/.cache/repository');
+        $hook = $this->gitPath($worktree, 'hooks/pre-commit');
+
+        $this->runInSandbox(\sprintf('echo "rm -rf ~" > %s', escapeshellarg($hook)), project: $worktree);
+
+        self::assertFileDoesNotExist($hook);
+    }
+
+    public function testAWorktreesGitDirectoryKeepsItsCommonDirectoryWhereACommandMayWrite(): void
+    {
+        $worktree = $this->worktreeOf($this->root.'/home/.cache/repository');
+        $commonDirectoryFile = $this->root.'/home/.cache/repository/.git/worktrees/worktree/commondir';
+        $commonDirectory = $this->filesystem->readFile($commonDirectoryFile);
+
+        $this->runInSandbox(\sprintf('echo "../../../../../worktree/planted/.git" > %s', escapeshellarg($commonDirectoryFile)), project: $worktree);
+
+        self::assertSame($commonDirectory, $this->filesystem->readFile($commonDirectoryFile));
+    }
+
+    public function testAWorktreesRepositoryKeepsItsHooksWhereACommandMayWriteWhenItsGitDirectoryHasNoHead(): void
+    {
+        $worktree = $this->worktreeOf($this->root.'/home/.cache/repository');
+        $this->filesystem->remove($this->root.'/home/.cache/repository/.git/worktrees/worktree/HEAD');
+        $hook = $this->root.'/home/.cache/repository/.git/hooks/pre-commit';
+
+        $this->runInSandbox(\sprintf('echo "rm -rf ~" > %s', escapeshellarg($hook)), project: $worktree);
+
+        self::assertFileDoesNotExist($hook, 'A command that stripped HEAD in an earlier run could restore it after planting the hook.');
+    }
+
+    public function testAWorktreesRepositoryCannotBeMovedAsideWhereACommandMayWrite(): void
+    {
+        $worktree = $this->worktreeOf($this->root.'/home/.cache/repository');
+
+        $this->runInSandbox(\sprintf('mv %1$s/repository %1$s/moved', escapeshellarg($this->root.'/home/.cache')), project: $worktree);
+
+        self::assertDirectoryExists($this->root.'/home/.cache/repository/.git/worktrees/worktree');
+        self::assertDirectoryDoesNotExist($this->root.'/home/.cache/moved');
+    }
+
+    public function testAWorktreeWhoseRepositoryIsWhereACommandMayWriteStillCommits(): void
+    {
+        $worktree = $this->worktreeOf($this->root.'/home/.cache/repository');
+
+        $result = $this->runInSandbox('git -c user.name=Airlock -c user.email=airlock@example.invalid -c commit.gpgsign=false commit -q --allow-empty -m Inside && git log --format=%s -1', project: $worktree);
+
+        self::assertTrue($result->isSuccessful(), $result->output);
+        self::assertStringContainsString('Inside', $result->output);
+    }
+
+    public function testAWorktreeReachingItsRepositoryThroughASymbolicLinkACommandMayReplaceStopsTheCommand(): void
+    {
+        $worktree = $this->worktreeOf($this->root.'/repository');
+        $this->filesystem->symlink($this->root.'/repository', $this->root.'/home/.cache/link');
+        $this->filesystem->dumpFile($worktree.'/.git', \sprintf("gitdir: %s/home/.cache/link/.git/worktrees/worktree\n", $this->root));
+
+        $this->expectException(ReplaceableGitLinkException::class);
+        $this->expectExceptionMessageIsOrContains($this->root.'/home/.cache/link is a symbolic link');
+
+        $this->runInSandbox('true', project: $worktree);
+    }
+
+    public function testASymbolicLinkACommandCannotReplaceDoesNotStopIt(): void
+    {
+        $worktree = $this->worktreeOf($this->root.'/repository');
+        $this->filesystem->rename($this->root.'/repository/.git/hooks', $this->root.'/repository/hooks');
+        $this->filesystem->symlink('../hooks', $this->root.'/repository/.git/hooks');
+
+        $result = $this->runInSandbox('echo ran', project: $worktree);
+
+        self::assertSame("ran\n", $result->output, 'Outside the writable directories, a command cannot replace the link.');
+    }
+
+    public function testAWorktreesRepositoryKeepsItsConfigurationWhereACommandMayWrite(): void
+    {
+        $worktree = $this->worktreeOf($this->root.'/home/.cache/repository');
+
+        $this->runInSandbox('git config core.hooksPath /tmp/hooks', project: $worktree);
+
+        self::assertSame('', $this->gitConfig($worktree, 'core.hooksPath'));
     }
 
     public function testTheUsersKeysCannotBeRead(): void
@@ -328,6 +513,35 @@ final class BubblewrapTest extends TestCase
         self::assertFileExists($socket, 'ssh-agent did not start: '.$this->sshAgent->getErrorOutput());
 
         return $socket;
+    }
+
+    /**
+     * A linked worktree of a new repository made at $repository, as `git worktree add` makes it: its `.git` is a file
+     * pointing into the repository's own git directory.
+     */
+    private function worktreeOf(string $repository): string
+    {
+        $worktree = $this->root.'/worktree';
+        $this->filesystem->mkdir($repository);
+        new Process(['git', 'init', '-q'], $repository)->mustRun();
+        new Process(['git', '-c', 'user.name=Airlock', '-c', 'user.email=airlock@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-q', '--allow-empty', '-m', 'Start'], $repository)->mustRun();
+        new Process(['git', 'worktree', 'add', '-q', $worktree], $repository)->mustRun();
+
+        return $worktree;
+    }
+
+    /** Where git, run later outside the sandbox, finds $path of the worktree's repository. */
+    private function gitPath(string $worktree, string $path): string
+    {
+        return trim(new Process(['git', 'rev-parse', '--path-format=absolute', '--git-path', $path], $worktree)->mustRun()->getOutput());
+    }
+
+    private function gitConfig(string $worktree, string $key): string
+    {
+        $process = new Process(['git', 'config', '--get', $key], $worktree);
+        $process->run();
+
+        return trim($process->getOutput());
     }
 
     private function runInSandbox(string $commandLine, SandboxMode $mode = SandboxMode::Auto, int $timeoutSeconds = 30, ?string $project = null, ?string $sshAgentSocket = null): CommandResult

@@ -142,14 +142,16 @@ binary per platform, and reading a pull request's checks and comments for the
 agent (`github_pr_checks`, `github_pr_comments`): Airlock runs the user's `gh`
 itself, outside the sandbox, as a command never gets a token it could copy;
 what it reads comes back as an output does, checked for injection, marked as
-data, secrets masked.
+data, secrets masked. Opening a pull request (`github_open_pr`) goes the same
+way, through the form like a command asked every time: Airlock builds the
+`gh pr create` call itself from the branch's upstream, the form shows exactly
+what it creates, the signed state names that call, and it never pushes. Only
+GitHub, only these actions: any other service keeps the rule that its commands
+are the user's.
 
 Next, in this order:
 
 - Cursor and VS Code run end to end, as the others were.
-- Opening a pull request the same way, through the form like any command,
-  every time. Only GitHub, only these actions: any other service keeps the rule
-  that its commands are the user's.
 - A signed and notarized macOS binary, so that Gatekeeper opens it without a
   warning. Releases already prove where they come from: each binary is attested
   with its build provenance and an SBOM.

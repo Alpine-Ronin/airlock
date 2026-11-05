@@ -44,7 +44,10 @@ Every decision is kept in an audit log, readable as the MCP resource `airlock://
 A command never gets a token it could copy, so `gh` cannot reach GitHub from the sandbox. Airlock reads a pull request
 for the agent instead, with your own `gh` login: `github_pr_checks` gives its CI checks, `github_pr_comments` its
 reviews and comments, line comments included, the current branch's pull request or the one numbered. Neither asks you,
-and both come back like a command's output: checked, marked as data, secrets masked, and in the audit log. On GitHub
+and both come back like a command's output: checked, marked as data, secrets masked, and in the audit log.
+`github_open_pr` opens a pull request from the current branch, once the branch is pushed: Airlock never pushes. It asks
+you every time, showing the repository, the branch and the one it merges into, the title, whether it is a draft, and
+the body; you allow it once or refuse, and no grant covers it. On GitHub
 Enterprise, log in with `gh auth login --hostname <host>`: Airlock does not pass on `GH_ENTERPRISE_TOKEN`, which gh
 would send to whatever host the repository names.
 

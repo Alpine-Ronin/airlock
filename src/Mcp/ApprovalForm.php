@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Mcp;
 
+use App\GitHub\NewPullRequest;
+use App\GitHub\PullRequestOpener;
 use App\Grant\Grant;
 use App\Policy\Assessment;
 use App\Policy\Verdict;
@@ -34,8 +36,39 @@ final readonly class ApprovalForm
     {
         $decisions = Decision::offeredFor($assessment->verdict);
 
+        return $this->form($this->message($command, $assessment, $grants, $decisions, $plainWords), $decisions);
+    }
+
+    /**
+     * The form about a pull request to open, asked every time: what will be created, exactly as gh is called, the
+     * body indented so that nothing in it can pass for a line of the form.
+     */
+    public function pullRequest(NewPullRequest $pullRequest): ElicitRequest
+    {
+        $repository = $pullRequest->repository;
+        $details = [
+            'Repository: '.$repository->host.'/'.$repository->name,
+            'Branch: '.$pullRequest->head->head().' → '.$pullRequest->base,
+            'Title: '.$pullRequest->title,
+            'Draft: '.($pullRequest->isDraft ? 'yes' : 'no'),
+        ];
+        $message = implode("\n\n", [
+            'Asked every time: '.PullRequestOpener::REASON.'.',
+            "Open this pull request?\n\n    ".implode("\n    ", $details),
+            "Body:\n\n".$this->indented($pullRequest->body),
+            'Airlock opens it with your GitHub CLI, outside the sandbox.',
+        ]);
+
+        return $this->form($message, Decision::offeredFor(Verdict::AskEveryTime));
+    }
+
+    /**
+     * @param non-empty-list<Decision> $decisions
+     */
+    private function form(string $message, array $decisions): ElicitRequest
+    {
         return new ElicitRequest(
-            $this->message($command, $assessment, $grants, $decisions, $plainWords),
+            $message,
             new ElicitationSchema(
                 [self::DECISION => new EnumSchemaDefinition(
                     title: 'Decision',
@@ -66,6 +99,17 @@ final readonly class ApprovalForm
         }
 
         return implode("\n\n", $paragraphs);
+    }
+
+    private function indented(string $text): string
+    {
+        if ('' === trim($text)) {
+            return '    (empty)';
+        }
+
+        $lines = preg_split('/\R/u', rtrim($text));
+
+        return '    '.implode("\n    ", false === $lines ? [rtrim($text)] : $lines);
     }
 
     private function whyAsked(Assessment $assessment, ?string $plainWords): string

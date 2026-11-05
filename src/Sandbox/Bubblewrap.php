@@ -36,7 +36,14 @@ final readonly class Bubblewrap implements Sandbox
             $arguments[] = $writable;
             $arguments[] = $writable;
         }
-        foreach ($this->paths->readOnlyInProject($projectDirectory) as $readOnly) {
+        // A mount point can be written in but not moved or removed. The temporary directories are private: nothing
+        // there outlives the command.
+        foreach ($this->paths->fixedInProject($projectDirectory, alsoWritable: []) as $fixed) {
+            $arguments[] = '--bind';
+            $arguments[] = $fixed;
+            $arguments[] = $fixed;
+        }
+        foreach ($this->paths->readOnlyInProject($projectDirectory, alsoWritable: []) as $readOnly) {
             $arguments[] = '--ro-bind';
             $arguments[] = $readOnly;
             $arguments[] = $readOnly;

@@ -69,6 +69,17 @@ final readonly class CommandRunner
         return $this->runProcess(['gh', ...$arguments], [...$this->withoutAirlockEnvironment(), ...array_fill_keys(self::ENTERPRISE_TOKENS, false)]);
     }
 
+    /**
+     * Runs git outside the sandbox, as the GitHub CLI itself does: only Airlock's GitHub tools call it, with arguments
+     * they build, to read what the project's branch is pushed to.
+     *
+     * @param list<string> $arguments
+     */
+    public function runGit(array $arguments): CommandResult
+    {
+        return $this->runProcess(['git', ...$arguments], [...$this->withoutAirlockEnvironment(), ...array_fill_keys([...self::GITHUB_COM_TOKENS, ...self::ENTERPRISE_TOKENS], false)]);
+    }
+
     private function runConfined(string $commandLine, ?SshAgent $sshAgent): CommandResult
     {
         $command = $this->sandboxDetector->detect()->confine(['bash', '-c', $commandLine], $this->projectDirectory->path, $sshAgent);
