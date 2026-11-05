@@ -71,6 +71,7 @@ jobs:
               env:
                   GH_TOKEN: ${{ github.token }}
                   AIRLOCK_RELEASES_URL: ''
+              shell: bash
               run: |
                   sh install.sh 0.3.4 | tee install.log
                   grep -q '^Checked: ' install.log
