@@ -69,10 +69,7 @@ final readonly class ModelInjectionClassifier implements InjectionClassifier
         $chunks = $this->chunker->split($output);
         try {
             $answers = array_map(fn (string $chunk): DeferredResult => $this->ask($model, $chunk), $chunks->chunks);
-            $labels = [];
-            foreach ($chunks->chunks as $index => $chunk) {
-                $labels[] = $this->retries->read($answers[$index], fn (): DeferredResult => $this->ask($model, $chunk), $this->label(...));
-            }
+            $labels = $this->retries->readAll($answers, fn (int $index): DeferredResult => $this->ask($model, $chunks->chunks[$index]), $this->label(...));
         } catch (PlatformException|HttpClientException|\UnexpectedValueException $e) {
             $reason = NotCheckedReason::forFailure($e);
             $this->logger->warning('Airlock could not check a command output: {reason}.', ['reason' => $reason->describe(), 'exception' => $e]);
