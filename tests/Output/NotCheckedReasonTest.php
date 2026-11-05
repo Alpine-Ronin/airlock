@@ -31,6 +31,7 @@ final class NotCheckedReasonTest extends TestCase
         yield 'its total deadline' => [new TransportException('Max duration was reached for "'.self::URL.'".')];
         yield 'curl, resolving the host' => [new TransportException('Resolving timed out after 8001 milliseconds for "'.self::URL.'".')];
         yield 'curl, connecting' => [new TransportException('Connection timed out after 8001 milliseconds for "'.self::URL.'".')];
+        yield 'curl, in the TLS handshake' => [new TransportException('SSL connection timeout for "'.self::URL.'".')];
         yield 'curl, before the answer starts' => [new TransportException('Operation timed out after 1001 milliseconds with 0 bytes received for "'.self::URL.'".')];
         yield 'curl, while the answer trickles in' => [new TransportException('Operation timed out after 1000 milliseconds with 2 bytes received for "'.self::URL.'".')];
     }

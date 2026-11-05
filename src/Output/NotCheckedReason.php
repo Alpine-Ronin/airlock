@@ -29,13 +29,15 @@ enum NotCheckedReason: string
 
     /**
      * The messages a request ends with when its time is over: the HTTP client's idle timeout and total deadline, and
-     * curl's, which enforces the total deadline whether it is resolving the host, connecting or transferring.
+     * curl's, which enforces the total deadline whether it is resolving the host, connecting, in the TLS handshake or
+     * transferring.
      */
     private const array TIMEOUT_MESSAGES = [
         'Idle timeout reached for ',
         'Max duration was reached for ',
         'Resolving timed out after ',
         'Connection timed out after ',
+        'SSL connection timeout',
         'Operation timed out after ',
     ];
 

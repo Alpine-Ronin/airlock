@@ -197,12 +197,20 @@ final class ModelInjectionClassifierTest extends TestCase
 
     public function testOnlyThePartsOfALongOutputWhoseAnswerWasLostAreAskedForAgain(): void
     {
-        $httpClient = new MockHttpClient([RecordedResponses::fixture('output-check-clean'), $this->lateAnswer(), RecordedResponses::fixture('output-check-injection')]);
+        $responses = [RecordedResponses::fixture('output-check-clean'), self::lateAnswer(), RecordedResponses::fixture('output-check-injection')];
+        $asked = [];
+        $httpClient = new MockHttpClient(static function (string $method, string $url, array $options) use (&$responses, &$asked): MockResponse {
+            $asked[] = $options['body'] ?? null;
+
+            return array_shift($responses) ?? throw new \LogicException('No more recorded answers.');
+        });
 
         $check = $this->classifier($httpClient, new OutputChunker(chunkBytes: 64, overlapBytes: 8))->check(str_repeat('Build step finished. ', 5));
 
         self::assertSame(OutputVerdict::Injection, $check->verdict);
-        self::assertSame(3, $httpClient->getRequestsCount(), 'The part that was answered is not asked again.');
+        self::assertCount(3, $asked, 'The part that was answered is not asked again.');
+        self::assertNotSame($asked[0], $asked[1]);
+        self::assertSame($asked[1], $asked[2], 'The part whose answer was lost is the one asked again.');
     }
 
     public function testARateLimitLeavesTheOutputNotChecked(): void
