@@ -18,10 +18,16 @@ use Symfony\Component\Process\Process;
 final readonly class CommandRunner
 {
     /**
-     * The GitHub CLI's tokens, set when the client started Airlock with one: a command must not get a token it could
-     * copy, so only Airlock's own gh calls keep them.
+     * The GitHub CLI's tokens for github.com, set when the client started Airlock with one: a command must not get a
+     * token it could copy, so only Airlock's own gh calls keep them.
      */
-    private const array GITHUB_TOKENS = ['GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN'];
+    private const array GITHUB_COM_TOKENS = ['GH_TOKEN', 'GITHUB_TOKEN'];
+
+    /**
+     * Its tokens for GitHub Enterprise, which gh sends to whatever host the repository's remote names, and a command
+     * can change the remote a linked worktree points to: no process gets them, gh's per-host logins serve instead.
+     */
+    private const array ENTERPRISE_TOKENS = ['GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN'];
 
     /** What the agent gets back at most: the end of the output, where the result and the errors are. */
     private const int MAX_OUTPUT_BYTES = 64 * 1024;
@@ -60,14 +66,14 @@ final readonly class CommandRunner
      */
     public function runGitHubCli(array $arguments): CommandResult
     {
-        return $this->runProcess(['gh', ...$arguments], $this->withoutAirlockEnvironment());
+        return $this->runProcess(['gh', ...$arguments], [...$this->withoutAirlockEnvironment(), ...array_fill_keys(self::ENTERPRISE_TOKENS, false)]);
     }
 
     private function runConfined(string $commandLine, ?SshAgent $sshAgent): CommandResult
     {
         $command = $this->sandboxDetector->detect()->confine(['bash', '-c', $commandLine], $this->projectDirectory->path, $sshAgent);
 
-        return $this->runProcess($command, [...$this->withoutAirlockEnvironment(), ...array_fill_keys(self::GITHUB_TOKENS, false)]);
+        return $this->runProcess($command, [...$this->withoutAirlockEnvironment(), ...array_fill_keys([...self::GITHUB_COM_TOKENS, ...self::ENTERPRISE_TOKENS], false)]);
     }
 
     /**

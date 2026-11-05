@@ -65,18 +65,22 @@ final readonly class GitHubReader
     /**
      * The pull request numbered, or without a number the one the project's current branch opened.
      *
-     * @throws GitHubReadException when the GitHub CLI is not installed or finds no such pull request
+     * @throws PullRequestNotFoundException when the GitHub CLI finds no such pull request
+     * @throws GitHubReadException          when the GitHub CLI is not installed
      */
     public function pullRequest(?int $number): PullRequest
     {
         $this->assertCliIsInstalled();
         $call = ['pr', 'view', ...(null === $number ? [] : [(string) $number]), '--json', 'number,url', '--jq', '.number, .url'];
         $result = $this->runner->runGitHubCli($call);
-        $this->audit([$call], $result);
         $lines = explode("\n", trim($result->output));
         if (!$result->isSuccessful() || 2 !== \count($lines)) {
-            throw new GitHubReadException(\sprintf('The GitHub CLI found no such pull request: %s', trim($result->output)));
+            $check = $this->injectionClassifier->check($result->output);
+            $this->audit([$call], $result, $check);
+
+            throw new PullRequestNotFoundException($this->outputReport->result($result, $check));
         }
+        $this->audit([$call], $result);
 
         return PullRequest::fromUrl($lines[1]);
     }

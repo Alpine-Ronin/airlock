@@ -6,6 +6,7 @@ namespace App\Mcp;
 
 use App\GitHub\GitHubReader;
 use App\GitHub\GitHubReadException;
+use App\GitHub\PullRequestNotFoundException;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Schema\Content\TextContent;
 use Mcp\Schema\Result\CallToolResult;
@@ -40,6 +41,8 @@ final readonly class GitHubCommentsTool
                 ['pr', 'view', (string) $found->number, '--comments'],
                 ['api', '--hostname', $found->host, \sprintf('repos/%s/pulls/%d/comments', $found->repository, $found->number), '--paginate', '--jq', self::LINE_COMMENTS],
             ]);
+        } catch (PullRequestNotFoundException $e) {
+            return $e->report;
         } catch (GitHubReadException $e) {
             return CallToolResult::error([new TextContent($e->getMessage())]);
         }
