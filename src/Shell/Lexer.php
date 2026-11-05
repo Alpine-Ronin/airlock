@@ -30,6 +30,8 @@ final class Lexer
 
     private bool $isWordLiteral = true;
 
+    private ?int $wordQuotedFrom = null;
+
     /** @var list<Token> */
     private array $tokens = [];
 
@@ -86,12 +88,15 @@ final class Lexer
         if ("\n" === $next) {
             return;
         }
-        $this->append($next);
+        $this->wordQuotedFrom ??= \strlen($this->word);
+        // A backslash that ends the line escapes nothing: bash keeps it.
+        $this->append('' === $next ? '\\' : $next);
     }
 
     private function readSingleQuoted(): void
     {
         $this->isInWord = true;
+        $this->wordQuotedFrom ??= \strlen($this->word);
         $end = strpos($this->line, "'", $this->position + 1);
         if (false === $end) {
             $this->markOpaque(Opacity::UnclosedQuote);
@@ -104,6 +109,7 @@ final class Lexer
     private function readDoubleQuoted(): void
     {
         $this->isInWord = true;
+        $this->wordQuotedFrom ??= \strlen($this->word);
         $length = \strlen($this->line);
         for (++$this->position; $this->position < $length; ++$this->position) {
             $character = $this->line[$this->position];
@@ -207,8 +213,8 @@ final class Lexer
 
     private function readRedirection(): void
     {
-        // Digits written right before the operator name a file descriptor (2>&1), not a word.
-        if ($this->isInWord && $this->isWordLiteral && ctype_digit($this->word)) {
+        // Unquoted digits written right before the operator name a file descriptor (2>&1), not a word.
+        if ($this->isInWord && $this->isWordLiteral && null === $this->wordQuotedFrom && ctype_digit($this->word)) {
             $this->word = '';
             $this->isInWord = false;
         }
@@ -248,10 +254,11 @@ final class Lexer
         if (!$this->isInWord) {
             return;
         }
-        $this->tokens[] = new Token(TokenType::Word, $this->word, $this->isWordLiteral);
+        $this->tokens[] = new Token(TokenType::Word, $this->word, $this->isWordLiteral, $this->wordQuotedFrom);
         $this->word = '';
         $this->isInWord = false;
         $this->isWordLiteral = true;
+        $this->wordQuotedFrom = null;
     }
 
     private function markOpaque(Opacity $opacity): void
