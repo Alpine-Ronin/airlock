@@ -16,7 +16,8 @@ minor version may change the configuration and file formats.
 
 - A command got the GitHub CLI's token when the client started Airlock with one in its environment (`GH_TOKEN`,
   `GITHUB_TOKEN`, or their Enterprise forms): an approved command could use it or copy it. Commands no longer get
-  these variables; only Airlock's own GitHub reads use them.
+  these variables; only Airlock's own GitHub reads use them, and never the Enterprise ones, which gh sends to any host
+  the repository names.
 
 ## 0.3.5 (2026-11-05)
 
