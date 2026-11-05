@@ -29,9 +29,15 @@ enum NotCheckedReason: string
 
     /**
      * The messages a request ends with when its time is over: the HTTP client's idle timeout and total deadline, and
-     * curl's, which enforces the total deadline when it does the transfer.
+     * curl's, which enforces the total deadline whether it is resolving the host, connecting or transferring.
      */
-    private const array TIMEOUT_MESSAGES = ['Idle timeout reached for ', 'Max duration was reached for ', 'Operation timed out after ', 'Connection timed out after '];
+    private const array TIMEOUT_MESSAGES = [
+        'Idle timeout reached for ',
+        'Max duration was reached for ',
+        'Resolving timed out after ',
+        'Connection timed out after ',
+        'Operation timed out after ',
+    ];
 
     /**
      * The HTTP client throws its own timeout once, then a plain transport exception holding only its message each time
