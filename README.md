@@ -75,6 +75,16 @@ has `sandbox-exec` built in.
 shasum -a 256 airlock-<platform> && chmod +x airlock-<platform>
 ```
 
+Each binary is attested from 0.3.4 on: GitHub signs where it was built (this repository, its tag and commit, the
+release workflow) and what it holds, the PHP packages listed in `airlock.cdx.json`, the release's CycloneDX SBOM. The
+static PHP runtime and its extensions are not in the SBOM. With the [GitHub CLI](https://cli.github.com):
+
+```bash
+gh attestation verify airlock-<platform> --repo hbenabdallah/airlock --signer-workflow hbenabdallah/airlock/.github/workflows/binaries.yaml --source-ref refs/tags/v<version>
+```
+
+The same command with `--predicate-type https://cyclonedx.org/bom` checks the SBOM attestation.
+
 The server command:
 
 ```bash

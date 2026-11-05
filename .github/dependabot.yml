@@ -1,0 +1,20 @@
+# The workflows pin each action to a commit: Dependabot proposes the new commit, and a new major, as a pull request.
+version: 2
+updates:
+    - package-ecosystem: github-actions
+      directory: /
+      schedule:
+          interval: weekly
+      groups:
+          actions:
+              patterns: ['*']
+              update-types: [minor, patch]
+
+    - package-ecosystem: composer
+      directory: /
+      schedule:
+          interval: weekly
+      groups:
+          composer:
+              patterns: ['*']
+              update-types: [minor, patch]

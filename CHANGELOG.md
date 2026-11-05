@@ -3,6 +3,19 @@
 What changed in each release, newest first. Versions follow [semantic versioning](https://semver.org): until 1.0, a
 minor version may change the configuration and file formats.
 
+## Unreleased
+
+### Added
+
+- Each release binary comes with signed attestations of where it was built (this repository, its tag and commit, the
+  release workflow) and of what it holds, a CycloneDX SBOM of its PHP packages published with it as
+  `airlock.cdx.json`: `gh attestation verify` checks both.
+
+### Security
+
+- The workflows pin each action to a commit and keep the token out of their checkouts, and only the job that publishes
+  a release can write to the repository; Dependabot proposes the updates.
+
 ## 0.3.3 (2026-11-05)
 
 ### Added

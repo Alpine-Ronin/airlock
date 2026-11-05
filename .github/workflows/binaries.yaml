@@ -27,9 +27,11 @@ jobs:
     phar:
         runs-on: ubuntu-24.04
         steps:
-            - uses: actions/checkout@v5
+            - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+              with:
+                  persist-credentials: false
 
-            - uses: shivammathur/setup-php@v2
+            - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
               with:
                   php-version: ${{ env.PHP_VERSION }}
                   coverage: none
@@ -37,16 +39,36 @@ jobs:
 
             - run: composer install --no-dev --classmap-authoritative --no-scripts --no-interaction --no-progress
 
+            # The PHP packages the PHAR holds, as a CycloneDX SBOM: a pinned generator, run outside the project so that it
+            # is no dependency of it. The static PHP runtime and its extensions are not in it.
+            - name: Write the SBOM
+              env:
+                  SBOM_VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || github.sha }}
+              run: |
+                  composer global config --no-interaction allow-plugins.cyclonedx/cyclonedx-php-composer true
+                  composer global require --no-interaction --no-progress cyclonedx/cyclonedx-php-composer:6.2.0
+                  mkdir -p build
+                  composer CycloneDX:make-sbom --omit=dev --spec-version=1.6 --output-format=JSON --validate \
+                    --mc-version="$SBOM_VERSION" --output-file=build/airlock.cdx.json
+
+            - name: Check that the SBOM lists every package the PHAR holds, and no other
+              run: python3 .github/scripts/check_sbom.py composer.lock build/airlock.cdx.json
+
             - run: composer dump-env prod
 
             - run: php bin/console cache:warmup
 
             - run: php bin/build-phar.php build/airlock.phar
 
-            - uses: actions/upload-artifact@v4
+            - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
               with:
                   name: airlock.phar
                   path: build/airlock.phar
+
+            - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+              with:
+                  name: airlock.cdx.json
+                  path: build/airlock.cdx.json
 
     binary:
         name: binary (${{ matrix.target }}, ${{ matrix.os }})
@@ -62,9 +84,11 @@ jobs:
                     - { target: macos-aarch64, os: macos-15, spc-sha256: acf2f25d56d0cbf8e65aa82e5054fef555f7be7c5c38046c6e0819f266d83225 }
         runs-on: ${{ matrix.os }}
         steps:
-            - uses: actions/checkout@v5
+            - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+              with:
+                  persist-credentials: false
 
-            - uses: actions/download-artifact@v4
+            - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
               with:
                   name: airlock.phar
                   path: build
@@ -76,7 +100,7 @@ jobs:
 
             - name: Restore the static PHP runtime
               id: runtime
-              uses: actions/cache@v4
+              uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
               with:
                   path: buildroot/bin/micro.sfx
                   key: ${{ steps.runtime-key.outputs.key }}
@@ -134,7 +158,7 @@ jobs:
                   cd "$(mktemp -d)" && "$binary" connect codex --no-interaction
                   grep -Fx "command = \"$binary\"" "$HOME/.codex/config.toml"
 
-            - uses: actions/upload-artifact@v4
+            - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
               with:
                   name: airlock-${{ matrix.target }}
                   path: airlock-${{ matrix.target }}
@@ -145,15 +169,34 @@ jobs:
         runs-on: ubuntu-24.04
         permissions:
             contents: write
+            # Sign the attestations with a Sigstore certificate issued for this workflow run, and store them.
+            id-token: write
+            attestations: write
         steps:
-            - uses: actions/download-artifact@v4
+            - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
               with:
                   pattern: airlock-*
                   merge-multiple: true
 
-            - run: sha256sum airlock-* > SHA256SUMS
+            - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+              with:
+                  name: airlock.cdx.json
+
+            # Each binary is signed as built by this workflow, from this tag and commit: gh attestation verify checks it.
+            - name: Attest where the binaries come from
+              uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+              with:
+                  subject-path: airlock-*
+
+            - name: Attest what the binaries hold
+              uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+              with:
+                  subject-path: airlock-*
+                  sbom-path: airlock.cdx.json
+
+            - run: sha256sum airlock-* airlock.cdx.json > SHA256SUMS
 
             - name: Publish the release
               env:
                   GH_TOKEN: ${{ github.token }}
-              run: gh release create "$GITHUB_REF_NAME" airlock-* SHA256SUMS --repo "$GITHUB_REPOSITORY" --generate-notes
+              run: gh release create "$GITHUB_REF_NAME" airlock-* airlock.cdx.json SHA256SUMS --repo "$GITHUB_REPOSITORY" --generate-notes
