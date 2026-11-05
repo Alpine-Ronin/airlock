@@ -161,6 +161,13 @@ final class BubblewrapTest extends TestCase
         self::assertSame('', $this->filesystem->readFile($this->root.'/project/.git/config'));
     }
 
+    public function testAGitCommonDirectoryCannotBePlanted(): void
+    {
+        $this->runInSandbox('git init -q planted && echo "../planted/.git" > .git/commondir');
+
+        self::assertSame(".\n", $this->filesystem->readFile($this->root.'/project/.git/commondir'), 'Git would take its hooks and configuration from the planted repository.');
+    }
+
     public function testTheGitConfigurationCannotBeChanged(): void
     {
         $this->runInSandbox('echo "[core] hooksPath = /tmp/hooks" >> .git/config');
@@ -212,6 +219,17 @@ final class BubblewrapTest extends TestCase
         $this->runInSandbox(\sprintf('echo "rm -rf ~" > %s', escapeshellarg($hook)), project: $worktree);
 
         self::assertFileDoesNotExist($hook);
+    }
+
+    public function testAWorktreesGitDirectoryKeepsItsCommonDirectoryWhereACommandMayWrite(): void
+    {
+        $worktree = $this->worktreeOf($this->root.'/home/.cache/repository');
+        $commonDirectoryFile = $this->root.'/home/.cache/repository/.git/worktrees/worktree/commondir';
+        $commonDirectory = $this->filesystem->readFile($commonDirectoryFile);
+
+        $this->runInSandbox(\sprintf('echo "../../../../../worktree/planted/.git" > %s', escapeshellarg($commonDirectoryFile)), project: $worktree);
+
+        self::assertSame($commonDirectory, $this->filesystem->readFile($commonDirectoryFile));
     }
 
     public function testAWorktreesRepositoryKeepsItsConfigurationWhereACommandMayWrite(): void
@@ -387,7 +405,7 @@ final class BubblewrapTest extends TestCase
         $worktree = $this->root.'/worktree';
         $this->filesystem->mkdir($repository);
         new Process(['git', 'init', '-q'], $repository)->mustRun();
-        new Process(['git', '-c', 'user.name=Airlock', '-c', 'user.email=airlock@example.invalid', 'commit', '-q', '--allow-empty', '-m', 'Start'], $repository)->mustRun();
+        new Process(['git', '-c', 'user.name=Airlock', '-c', 'user.email=airlock@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-q', '--allow-empty', '-m', 'Start'], $repository)->mustRun();
         new Process(['git', 'worktree', 'add', '-q', $worktree], $repository)->mustRun();
 
         return $worktree;

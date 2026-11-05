@@ -37,6 +37,12 @@ final readonly class SandboxPaths
 
     private const array GIT_CONTROL_FILES = ['config'];
 
+    /**
+     * Under a git directory, where git takes its hooks and configuration from instead when it exists. A missing one is
+     * made naming the git directory itself, `.`: git refuses an empty one.
+     */
+    private const string GIT_COMMON_DIRECTORY_FILE = 'commondir';
+
     /** How a `.git` file starts: a linked worktree, or a repository made with `--separate-git-dir`. */
     private const string GIT_FILE_POINTER = 'gitdir: ';
 
@@ -156,10 +162,10 @@ final readonly class SandboxPaths
 
     /**
      * Paths of the project's repository a command may read but not change. In a git directory, those git would
-     * otherwise create are made first, empty, as `git init` makes them: a path that does not exist cannot be kept
-     * read-only, and a command could plant it. When `.git` is a file, it is kept too, with the git directory it points
-     * to and the common one that directory shares, wherever they are: a command could otherwise point it at a git
-     * directory of its own making.
+     * otherwise create are made first, as `git init` makes them: a path that does not exist cannot be kept read-only,
+     * and a command could plant it. When `.git` is a file, it is kept too, with the git directory it points to and the
+     * common one that directory shares, wherever they are: a command could otherwise point it at a git directory of its
+     * own making. A directory it points to is made nothing in unless it is a git directory.
      *
      * @return list<string>
      */
@@ -187,10 +193,14 @@ final readonly class SandboxPaths
     {
         $directories = array_map(static fn (string $control): string => $gitDirectory.'/'.$control, self::GIT_CONTROL_DIRECTORIES);
         $files = array_map(static fn (string $control): string => $gitDirectory.'/'.$control, self::GIT_CONTROL_FILES);
+        $commonDirectoryFile = $gitDirectory.'/'.self::GIT_COMMON_DIRECTORY_FILE;
         $this->filesystem->mkdir($directories);
         $this->filesystem->touch($files);
+        if (!file_exists($commonDirectoryFile)) {
+            $this->filesystem->dumpFile($commonDirectoryFile, ".\n");
+        }
 
-        return $this->existing([...$directories, ...$files]);
+        return $this->existing([...$directories, ...$files, $commonDirectoryFile]);
     }
 
     /**
@@ -206,16 +216,27 @@ final readonly class SandboxPaths
             return [];
         }
         $gitDirectory = $this->resolvedFrom(\dirname($gitFile), substr($pointer, \strlen(self::GIT_FILE_POINTER)));
-        if (null === $gitDirectory) {
+        if (null === $gitDirectory || !$this->isGitDirectory($gitDirectory)) {
             return [];
         }
-        $commonDirectoryFile = $gitDirectory.'/commondir';
+        $commonDirectoryFile = $gitDirectory.'/'.self::GIT_COMMON_DIRECTORY_FILE;
         if (!is_file($commonDirectoryFile)) {
             return [$gitDirectory];
         }
         $commonDirectory = $this->resolvedFrom($gitDirectory, $this->filesystem->readFile($commonDirectoryFile));
+        if (null === $commonDirectory || !$this->isGitDirectory($commonDirectory)) {
+            return [$gitDirectory];
+        }
 
-        return null === $commonDirectory ? [$gitDirectory] : [$gitDirectory, $commonDirectory];
+        return [$gitDirectory, $commonDirectory];
+    }
+
+    /**
+     * Whether $directory is a git directory: it has a HEAD, the first thing git looks for in one.
+     */
+    private function isGitDirectory(string $directory): bool
+    {
+        return is_file($directory.'/HEAD');
     }
 
     /**

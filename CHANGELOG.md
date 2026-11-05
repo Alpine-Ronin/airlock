@@ -27,6 +27,9 @@ minor version may change the configuration and file formats.
   inside the project, with its own hooks and configuration: git then ran them outside the sandbox, and Airlock's own
   GitHub reads took the repository from them. The `.git` file is now read-only to a command, like the `hooks` and
   `config` of the git directory it points to and of the common one, wherever they are.
+- In any repository, a command could write `.git/commondir`, which tells git to take its hooks and configuration from
+  another git directory, one of its own. `commondir` is now read-only to a command; where there is none, Airlock first
+  makes one naming the git directory itself (`.`), which git reads as if there were none.
 
 ## 0.3.5 (2026-11-05)
 

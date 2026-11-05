@@ -64,15 +64,27 @@ final class SandboxExecTest extends TestCase
         $repository = self::HOME.'/repository';
         new Filesystem()->mkdir($repository);
         new Process(['git', 'init', '-q'], $repository)->mustRun();
-        new Process(['git', '-c', 'user.name=Airlock', '-c', 'user.email=airlock@example.invalid', 'commit', '-q', '--allow-empty', '-m', 'Start'], $repository)->mustRun();
+        new Process(['git', '-c', 'user.name=Airlock', '-c', 'user.email=airlock@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-q', '--allow-empty', '-m', 'Start'], $repository)->mustRun();
         new Process(['git', 'worktree', 'add', '-q', self::HOME.'/worktree'], $repository)->mustRun();
         $home = (string) realpath(self::HOME);
 
         $profile = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), cutsNetwork: false)->confine(['true'], $home.'/worktree')[2];
 
-        foreach (['/worktree/.git', '/repository/.git/hooks', '/repository/.git/config', '/repository/.git/worktrees/worktree/hooks', '/repository/.git/worktrees/worktree/config'] as $readOnly) {
+        foreach (['/worktree/.git', '/repository/.git/hooks', '/repository/.git/config', '/repository/.git/commondir', '/repository/.git/worktrees/worktree/hooks', '/repository/.git/worktrees/worktree/config', '/repository/.git/worktrees/worktree/commondir'] as $readOnly) {
             self::assertStringContainsString(\sprintf('(deny file-write* (subpath "%s%s"))', $home, $readOnly), $profile);
         }
+    }
+
+    public function testAGitFilePointingAtNoGitDirectoryMakesNothingThere(): void
+    {
+        new Filesystem()->mkdir([self::HOME.'/project', self::HOME.'/.kube']);
+        new Filesystem()->dumpFile(self::HOME.'/project/.git', 'gitdir: ../.kube'."\n");
+        $home = (string) realpath(self::HOME);
+
+        $profile = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), cutsNetwork: false)->confine(['true'], $home.'/project')[2];
+
+        self::assertSame(['.', '..'], scandir($home.'/.kube'), 'Nothing is made in a directory that is no git directory.');
+        self::assertStringContainsString(\sprintf('(deny file-write* (subpath "%s/project/.git"))', $home), $profile);
     }
 
     public function testStrictCutsTheNetwork(): void
