@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Risk;
 
 use App\Configuration\ModelApi;
+use App\Configuration\ModelRetries;
 use App\Output\DataTag;
 use Psr\Log\LoggerInterface;
 use Symfony\AI\Platform\Exception\ExceptionInterface as PlatformException;
 use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\PlatformInterface;
+use Symfony\AI\Platform\Result\DeferredResult;
 use Symfony\Component\DependencyInjection\Attribute\AsAlias;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\DependencyInjection\Attribute\Target;
@@ -40,6 +42,7 @@ final readonly class ModelRiskExplainer implements RiskExplainer
         private PlatformInterface $platform,
         private LoggerInterface $logger,
         private ModelApi $modelApi,
+        private ModelRetries $retries,
         #[Autowire(env: 'model_setting:AIRLOCK_RISK_MODEL')]
         private string $model,
     ) {
@@ -69,14 +72,15 @@ final readonly class ModelRiskExplainer implements RiskExplainer
             return null;
         }
 
-        $answer = $this->platform->invoke(
+        $ask = fn (): DeferredResult => $this->platform->invoke(
             $model,
             new MessageBag(
                 Message::forSystem(self::INSTRUCTIONS),
                 Message::ofUser(DataTag::wrap('command', $command)),
             ),
             ['response_format' => PlainWords::class, 'max_tokens' => 60, 'temperature' => 0],
-        )->asObject();
+        );
+        $answer = $this->retries->read($ask(), $ask, static fn (DeferredResult $result): mixed => $result->asObject());
 
         return $answer instanceof PlainWords ? $this->oneLine($answer->summary) : null;
     }

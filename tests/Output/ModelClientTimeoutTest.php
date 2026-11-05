@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Output;
 
 use App\Configuration\ModelApi;
+use App\Configuration\ModelRetries;
 use App\Output\ModelInjectionClassifier;
 use App\Output\NotCheckedReason;
 use App\Output\OutputChunker;
@@ -64,7 +65,7 @@ final class ModelClientTimeoutTest extends TestCase
         $dispatcher = new EventDispatcher();
         $dispatcher->addSubscriber(new PlatformSubscriber());
         $platform = Factory::createPlatform($baseUrl, 'test-key', HttpClient::create($this->configuredOptions()), eventDispatcher: $dispatcher, supportsEmbeddings: false, name: 'models');
-        $classifier = new ModelInjectionClassifier($platform, new OutputChunker(), new NullLogger(), new ModelApi($baseUrl, 'test-key'), 'test/output-check');
+        $classifier = new ModelInjectionClassifier($platform, new OutputChunker(), new NullLogger(), new ModelApi($baseUrl, 'test-key'), new ModelRetries(1), 'test/output-check');
 
         $check = $classifier->check("Build finished.\n");
 

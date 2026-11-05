@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Output;
 
 use App\Configuration\ModelApi;
+use App\Configuration\ModelRetries;
 use App\Output\ModelInjectionClassifier;
 use App\Output\NotCheckedReason;
 use App\Output\OutputCheck;
@@ -121,7 +122,7 @@ final class ModelInjectionClassifierTest extends TestCase
 
     public function testAServerErrorLeavesTheOutputNotCheckedAndIsLogged(): void
     {
-        $check = $this->classifier(new MockHttpClient([new MockResponse('{"status":503,"title":"Service Unavailable"}', ['http_code' => 503])]))->check(self::README);
+        $check = $this->classifier(new MockHttpClient([$this->serverError(), $this->serverError()]))->check(self::README);
 
         self::assertSame(NotCheckedReason::Error, $check->reason);
         self::assertCount(1, $this->logger->records);
@@ -130,9 +131,78 @@ final class ModelInjectionClassifierTest extends TestCase
 
     public function testATimeoutLeavesTheOutputNotChecked(): void
     {
-        $check = $this->classifier(new MockHttpClient([new MockResponse([''])]))->check(self::README);
+        $check = $this->classifier(new MockHttpClient([$this->lateAnswer(), $this->lateAnswer()]))->check(self::README);
 
         self::assertSame(NotCheckedReason::Timeout, $check->reason);
+    }
+
+    public function testAnAnswerThatCameTooLateIsAskedForAgain(): void
+    {
+        $httpClient = new MockHttpClient([$this->lateAnswer(), RecordedResponses::fixture('output-check-injection')]);
+
+        $check = $this->classifier($httpClient)->check(self::README);
+
+        self::assertSame(OutputVerdict::Injection, $check->verdict);
+        self::assertSame(2, $httpClient->getRequestsCount());
+    }
+
+    public function testAnAnswerLostToAServerErrorIsAskedForAgain(): void
+    {
+        $httpClient = new MockHttpClient([$this->serverError(), RecordedResponses::fixture('output-check-injection')]);
+
+        $check = $this->classifier($httpClient)->check(self::README);
+
+        self::assertSame(OutputVerdict::Injection, $check->verdict);
+    }
+
+    public function testARateLimitIsNotAskedForAgain(): void
+    {
+        $httpClient = new MockHttpClient([RecordedResponses::fixture('rate-limited', 429), RecordedResponses::fixture('output-check-clean')]);
+
+        $check = $this->classifier($httpClient)->check(self::README);
+
+        self::assertSame(NotCheckedReason::RateLimited, $check->reason);
+        self::assertSame(1, $httpClient->getRequestsCount());
+    }
+
+    public function testAnAnswerThatCameButCannotBeUsedIsNotAskedForAgain(): void
+    {
+        $httpClient = new MockHttpClient([RecordedResponses::answering('clean, I think'), RecordedResponses::fixture('output-check-clean')]);
+
+        $check = $this->classifier($httpClient)->check(self::README);
+
+        self::assertSame(NotCheckedReason::Error, $check->reason);
+        self::assertSame(1, $httpClient->getRequestsCount());
+    }
+
+    public function testAModelIsAskedAgainNoMoreThanTheRetriesAllow(): void
+    {
+        $httpClient = new MockHttpClient([$this->lateAnswer(), $this->lateAnswer(), $this->lateAnswer(), RecordedResponses::fixture('output-check-clean')]);
+
+        $check = $this->classifier($httpClient, retries: new ModelRetries(2))->check(self::README);
+
+        self::assertSame(NotCheckedReason::Timeout, $check->reason);
+        self::assertSame(3, $httpClient->getRequestsCount());
+    }
+
+    public function testWithoutRetriesAModelIsAskedOnce(): void
+    {
+        $httpClient = new MockHttpClient([$this->lateAnswer(), RecordedResponses::fixture('output-check-clean')]);
+
+        $check = $this->classifier($httpClient, retries: new ModelRetries(0))->check(self::README);
+
+        self::assertSame(NotCheckedReason::Timeout, $check->reason);
+        self::assertSame(1, $httpClient->getRequestsCount());
+    }
+
+    public function testOnlyThePartsOfALongOutputWhoseAnswerWasLostAreAskedForAgain(): void
+    {
+        $httpClient = new MockHttpClient([RecordedResponses::fixture('output-check-clean'), $this->lateAnswer(), RecordedResponses::fixture('output-check-injection')]);
+
+        $check = $this->classifier($httpClient, new OutputChunker(chunkBytes: 64, overlapBytes: 8))->check(str_repeat('Build step finished. ', 5));
+
+        self::assertSame(OutputVerdict::Injection, $check->verdict);
+        self::assertSame(3, $httpClient->getRequestsCount(), 'The part that was answered is not asked again.');
     }
 
     public function testARateLimitLeavesTheOutputNotChecked(): void
@@ -161,8 +231,19 @@ final class ModelInjectionClassifierTest extends TestCase
         OutputChunker $chunker = new OutputChunker(),
         ModelApi $modelApi = new ModelApi(RecordedResponses::BASE_URL, 'test-key'),
         string $model = 'test/output-check',
+        ModelRetries $retries = new ModelRetries(1),
     ): ModelInjectionClassifier {
-        return new ModelInjectionClassifier(RecordedResponses::platform($httpClient), $chunker, $this->logger, $modelApi, $model);
+        return new ModelInjectionClassifier(RecordedResponses::platform($httpClient), $chunker, $this->logger, $modelApi, $retries, $model);
+    }
+
+    private function lateAnswer(): MockResponse
+    {
+        return new MockResponse(['']);
+    }
+
+    private function serverError(): MockResponse
+    {
+        return new MockResponse('{"status":503,"title":"Service Unavailable"}', ['http_code' => 503]);
     }
 
     /**

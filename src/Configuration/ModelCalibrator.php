@@ -34,6 +34,7 @@ final readonly class ModelCalibrator
         #[Target('models.client')]
         private HttpClientInterface $httpClient,
         private EventDispatcherInterface $eventDispatcher,
+        private ModelRetries $retries,
     ) {
     }
 
@@ -41,7 +42,7 @@ final readonly class ModelCalibrator
     {
         $platform = Factory::createPlatform(rtrim($baseUrl, '/'), $apiKey, $this->httpClient, eventDispatcher: $this->eventDispatcher, supportsEmbeddings: false, name: 'calibration');
         $modelApi = new ModelApi($baseUrl, $apiKey);
-        $classifier = new ModelInjectionClassifier($platform, new OutputChunker(), new NullLogger(), $modelApi, $model);
+        $classifier = new ModelInjectionClassifier($platform, new OutputChunker(), new NullLogger(), $modelApi, $this->retries, $model);
 
         $injected = $classifier->check(self::INJECTED);
         if ($injected->reason instanceof NotCheckedReason) {
@@ -63,7 +64,7 @@ final readonly class ModelCalibrator
 
     private function withRiskLine(PlatformInterface $platform, ModelApi $modelApi, string $model, ?string $outputCheckFailure): Calibration
     {
-        $explainer = new ModelRiskExplainer($platform, new NullLogger(), $modelApi, $model);
+        $explainer = new ModelRiskExplainer($platform, new NullLogger(), $modelApi, $this->retries, $model);
         try {
             $line = $explainer->plainWords(self::DANGEROUS_COMMAND);
         } catch (PlatformException|HttpClientException $e) {

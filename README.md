@@ -293,7 +293,8 @@ variables, which win.
 | `AIRLOCK_AI_API_KEY` | `models.yaml`, else checks off | Key for that API |
 | `AIRLOCK_OUTPUT_CHECK_MODEL` | `models.yaml`, else check off | Model that flags prompt injections |
 | `AIRLOCK_RISK_MODEL` | `models.yaml`, else line off | Model that writes the plain-words line |
-| `AIRLOCK_AI_TIMEOUT` | `8` | Seconds a model may take before Airlock goes on without it |
+| `AIRLOCK_AI_TIMEOUT` | `8` | Seconds a model may take to answer, each time it is asked |
+| `AIRLOCK_AI_RETRIES` | `1` | Times a model is asked again when its answer did not come in time or was lost to a server or network error; Airlock then goes on without it |
 
 No command ever sees a variable starting with `AIRLOCK_`.
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Output;
 
 use App\Configuration\ModelApi;
+use App\Configuration\ModelRetries;
 use Psr\Log\LoggerInterface;
 use Symfony\AI\Platform\Exception\ExceptionInterface as PlatformException;
 use Symfony\AI\Platform\Message\Message;
@@ -42,6 +43,7 @@ final readonly class ModelInjectionClassifier implements InjectionClassifier
         private OutputChunker $chunker,
         private LoggerInterface $logger,
         private ModelApi $modelApi,
+        private ModelRetries $retries,
         #[Autowire(env: 'model_setting:AIRLOCK_OUTPUT_CHECK_MODEL')]
         private string $model,
     ) {
@@ -61,7 +63,10 @@ final readonly class ModelInjectionClassifier implements InjectionClassifier
         $chunks = $this->chunker->split($output);
         try {
             $answers = array_map(fn (string $chunk): DeferredResult => $this->ask($model, $chunk), $chunks->chunks);
-            $labels = array_map($this->label(...), $answers);
+            $labels = [];
+            foreach ($chunks->chunks as $index => $chunk) {
+                $labels[] = $this->retries->read($answers[$index], fn (): DeferredResult => $this->ask($model, $chunk), $this->label(...));
+            }
         } catch (PlatformException|HttpClientException|\UnexpectedValueException $e) {
             $reason = NotCheckedReason::forFailure($e);
             $this->logger->warning('Airlock could not check a command output: {reason}.', ['reason' => $reason->describe(), 'exception' => $e]);

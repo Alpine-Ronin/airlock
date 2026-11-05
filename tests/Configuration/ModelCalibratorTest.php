@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Configuration;
 
 use App\Configuration\ModelCalibrator;
+use App\Configuration\ModelRetries;
 use App\Tests\Output\RecordedModelApi;
 use App\Tests\Output\RecordedResponses;
 use PHPUnit\Framework\TestCase;
@@ -77,6 +78,6 @@ final class ModelCalibratorTest extends TestCase
         $dispatcher = new EventDispatcher();
         $dispatcher->addSubscriber(new PlatformSubscriber());
 
-        return new ModelCalibrator(new MockHttpClient(new RecordedModelApi(RecordedResponses::BASE_URL)), $dispatcher);
+        return new ModelCalibrator(new MockHttpClient(new RecordedModelApi(RecordedResponses::BASE_URL)), $dispatcher, new ModelRetries(1));
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Risk;
 
 use App\Configuration\ModelApi;
+use App\Configuration\ModelRetries;
 use App\Risk\ModelRiskExplainer;
 use App\Tests\Output\RecordedResponses;
 use App\Tests\Output\RecordingLogger;
@@ -69,7 +70,7 @@ final class ModelRiskExplainerTest extends TestCase
 
     public function testAFailureIsNoLineAndIsLogged(): void
     {
-        $line = $this->explainer(new MockHttpClient([new MockResponse('{"status":503,"title":"Service Unavailable"}', ['http_code' => 503])]))->explain('rm -rf build');
+        $line = $this->explainer(new MockHttpClient([$this->serverError(), $this->serverError()]))->explain('rm -rf build');
 
         self::assertNull($line);
         self::assertSame('warning', $this->logger->records[0]['level'] ?? null);
@@ -77,14 +78,24 @@ final class ModelRiskExplainerTest extends TestCase
 
     public function testATimeoutIsNoLine(): void
     {
-        self::assertNull($this->explainer(new MockHttpClient([new MockResponse([''])]))->explain('rm -rf build'));
+        self::assertNull($this->explainer(new MockHttpClient([new MockResponse(['']), new MockResponse([''])]))->explain('rm -rf build'));
+    }
+
+    public function testALineThatCameTooLateIsAskedForAgain(): void
+    {
+        $httpClient = new MockHttpClient([new MockResponse(['']), RecordedResponses::fixture('plain-words')]);
+
+        $line = $this->explainer($httpClient)->explain('rm -rf build');
+
+        self::assertNotNull($line);
+        self::assertSame(2, $httpClient->getRequestsCount());
     }
 
     public function testWithoutAnApiKeyNothingIsAsked(): void
     {
         $httpClient = new MockHttpClient([]);
 
-        $line = new ModelRiskExplainer(RecordedResponses::platform($httpClient), $this->logger, new ModelApi(RecordedResponses::BASE_URL, ''), 'test/risk')->explain('rm -rf build');
+        $line = new ModelRiskExplainer(RecordedResponses::platform($httpClient), $this->logger, new ModelApi(RecordedResponses::BASE_URL, ''), new ModelRetries(1), 'test/risk')->explain('rm -rf build');
 
         self::assertNull($line);
         self::assertSame(0, $httpClient->getRequestsCount());
@@ -92,6 +103,11 @@ final class ModelRiskExplainerTest extends TestCase
 
     private function explainer(MockHttpClient $httpClient): ModelRiskExplainer
     {
-        return new ModelRiskExplainer(RecordedResponses::platform($httpClient), $this->logger, new ModelApi(RecordedResponses::BASE_URL, 'test-key'), 'test/risk');
+        return new ModelRiskExplainer(RecordedResponses::platform($httpClient), $this->logger, new ModelApi(RecordedResponses::BASE_URL, 'test-key'), new ModelRetries(1), 'test/risk');
+    }
+
+    private function serverError(): MockResponse
+    {
+        return new MockResponse('{"status":503,"title":"Service Unavailable"}', ['http_code' => 503]);
     }
 }
