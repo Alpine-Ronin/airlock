@@ -24,6 +24,7 @@ use App\Policy\PolicyFiles;
 use App\Policy\Verdict;
 use App\Risk\RiskExplainer;
 use App\Sandbox\NoSandbox;
+use App\Sandbox\ReplaceableGitLinkException;
 use App\Sandbox\SandboxDetector;
 use App\Shell\CommandLine;
 use App\Shell\ShellParser;
@@ -142,7 +143,13 @@ final readonly class RunCommandTool
      */
     private function run(string $command, Assessment $assessment, Outcome $outcome, \Closure $run): CallToolResult
     {
-        $result = $run($command);
+        try {
+            $result = $run($command);
+        } catch (ReplaceableGitLinkException $e) {
+            $this->audit($command, $assessment, Outcome::Failed, detail: $e->getMessage());
+
+            return CallToolResult::error([new TextContent(\sprintf("Nothing runs until this is fixed: %s\n%s did not run.", $e->getMessage(), $command))]);
+        }
         $check = $this->injectionClassifier->check($result->output);
         $this->audit($command, $assessment, $outcome, $result, check: $check);
 

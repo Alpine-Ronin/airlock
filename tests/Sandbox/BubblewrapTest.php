@@ -10,6 +10,7 @@ use App\Execution\CommandRunner;
 use App\Execution\ProjectDirectory;
 use App\Output\SecretMasker;
 use App\Sandbox\Bubblewrap;
+use App\Sandbox\ReplaceableGitLinkException;
 use App\Sandbox\SandboxDetector;
 use App\Sandbox\SandboxMode;
 use App\Sandbox\SandboxPaths;
@@ -216,6 +217,36 @@ final class BubblewrapTest extends TestCase
         self::assertFileExists($this->root.'/project/.git/index');
     }
 
+    public function testAGitDirectoryCannotBeMovedAsideForOneOfItsOwn(): void
+    {
+        $result = $this->runInSandbox('mv .git .old && git init -q && echo "rm -rf ~" > .git/hooks/pre-commit');
+
+        self::assertFalse($result->isSuccessful());
+        self::assertDirectoryDoesNotExist($this->root.'/project/.old');
+        self::assertFileDoesNotExist($this->root.'/project/.git/hooks/pre-commit');
+    }
+
+    public function testASymbolicLinkToTheHooksStopsTheCommand(): void
+    {
+        $this->filesystem->rename($this->root.'/project/.git/hooks', $this->root.'/project/hooks');
+        $this->filesystem->symlink('../hooks', $this->root.'/project/.git/hooks');
+
+        $this->expectException(ReplaceableGitLinkException::class);
+        $this->expectExceptionMessageIsOrContains($this->root.'/project/.git/hooks is a symbolic link');
+
+        $this->runInSandbox('true');
+    }
+
+    public function testASymbolicLinkToTheGitDirectoryStopsTheCommand(): void
+    {
+        $this->filesystem->rename($this->root.'/project/.git', $this->root.'/outside/.git');
+        $this->filesystem->symlink($this->root.'/outside/.git', $this->root.'/project/.git');
+
+        $this->expectException(ReplaceableGitLinkException::class);
+
+        $this->runInSandbox('true');
+    }
+
     public function testAWorktreesGitFileCannotBeRewritten(): void
     {
         $worktree = $this->worktreeOf($this->root.'/repository');
@@ -275,6 +306,49 @@ final class BubblewrapTest extends TestCase
         $this->runInSandbox(\sprintf('echo "rm -rf ~" > %s', escapeshellarg($hook)), project: $worktree);
 
         self::assertFileDoesNotExist($hook, 'A command that stripped HEAD in an earlier run could restore it after planting the hook.');
+    }
+
+    public function testAWorktreesRepositoryCannotBeMovedAsideWhereACommandMayWrite(): void
+    {
+        $worktree = $this->worktreeOf($this->root.'/home/.cache/repository');
+
+        $this->runInSandbox(\sprintf('mv %1$s/repository %1$s/moved', escapeshellarg($this->root.'/home/.cache')), project: $worktree);
+
+        self::assertDirectoryExists($this->root.'/home/.cache/repository/.git/worktrees/worktree');
+        self::assertDirectoryDoesNotExist($this->root.'/home/.cache/moved');
+    }
+
+    public function testAWorktreeWhoseRepositoryIsWhereACommandMayWriteStillCommits(): void
+    {
+        $worktree = $this->worktreeOf($this->root.'/home/.cache/repository');
+
+        $result = $this->runInSandbox('git -c user.name=Airlock -c user.email=airlock@example.invalid -c commit.gpgsign=false commit -q --allow-empty -m Inside && git log --format=%s -1', project: $worktree);
+
+        self::assertTrue($result->isSuccessful(), $result->output);
+        self::assertStringContainsString('Inside', $result->output);
+    }
+
+    public function testAWorktreeReachingItsRepositoryThroughASymbolicLinkACommandMayReplaceStopsTheCommand(): void
+    {
+        $worktree = $this->worktreeOf($this->root.'/repository');
+        $this->filesystem->symlink($this->root.'/repository', $this->root.'/home/.cache/link');
+        $this->filesystem->dumpFile($worktree.'/.git', \sprintf("gitdir: %s/home/.cache/link/.git/worktrees/worktree\n", $this->root));
+
+        $this->expectException(ReplaceableGitLinkException::class);
+        $this->expectExceptionMessageIsOrContains($this->root.'/home/.cache/link is a symbolic link');
+
+        $this->runInSandbox('true', project: $worktree);
+    }
+
+    public function testASymbolicLinkACommandCannotReplaceDoesNotStopIt(): void
+    {
+        $worktree = $this->worktreeOf($this->root.'/repository');
+        $this->filesystem->rename($this->root.'/repository/.git/hooks', $this->root.'/repository/hooks');
+        $this->filesystem->symlink('../hooks', $this->root.'/repository/.git/hooks');
+
+        $result = $this->runInSandbox('echo ran', project: $worktree);
+
+        self::assertSame("ran\n", $result->output, 'Outside the writable directories, a command cannot replace the link.');
     }
 
     public function testAWorktreesRepositoryKeepsItsConfigurationWhereACommandMayWrite(): void

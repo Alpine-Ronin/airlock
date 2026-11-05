@@ -75,6 +75,16 @@ final class SandboxExecTest extends TestCase
         }
     }
 
+    public function testTheGitDirectoryCannotBeMovedOrRemoved(): void
+    {
+        new Filesystem()->mkdir(self::HOME.'/project/.git');
+        $home = (string) realpath(self::HOME);
+
+        $profile = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), cutsNetwork: false)->confine(['true'], $home.'/project')[2];
+
+        self::assertStringContainsString(\sprintf('(deny file-write-unlink (literal "%s/project/.git"))', $home), $profile);
+    }
+
     public function testAGitFilePointingAtNoGitDirectoryMakesNothingThere(): void
     {
         new Filesystem()->mkdir([self::HOME.'/project', self::HOME.'/.kube']);

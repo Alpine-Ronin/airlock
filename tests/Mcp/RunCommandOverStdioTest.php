@@ -13,6 +13,7 @@ use Composer\InstalledVersions;
 use PHPUnit\Framework\Attributes\RequiresOperatingSystemFamily;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Process\Process;
 
 /**
  * The server end to end over stdio, as a client sees it, in both protocol eras: 2026-07-28, where the tool returns
@@ -267,6 +268,22 @@ final class RunCommandOverStdioTest extends TestCase
 
         self::assertStringContainsString('Nothing runs until this is fixed', $this->text($answer, 'result', 'content', 0, 'text'));
         self::assertFileDoesNotExist($this->project.'/runs.txt');
+    }
+
+    public function testAGitConfigurationACommandCouldReplaceThroughASymbolicLinkStopsAnApprovedCommand(): void
+    {
+        new Process(['git', 'init', '-q'], $this->project)->mustRun();
+        $this->filesystem->rename($this->project.'/.git/config', $this->project.'/gitconfig');
+        $this->filesystem->symlink('../gitconfig', $this->project.'/.git/config');
+        $client = $this->client();
+        $state = $this->askState($client, self::COMMAND);
+
+        $answer = $client->request($this->modernCall(2, self::COMMAND, 'once', $state));
+
+        self::assertTrue($this->field($answer, 'result', 'isError'));
+        self::assertStringStartsWith(\sprintf('Nothing runs until this is fixed: %s/.git/config is a symbolic link', $this->project), $this->text($answer, 'result', 'content', 0, 'text'));
+        self::assertFileDoesNotExist($this->project.'/runs.txt');
+        self::assertSame('failed', $this->lastAuditEntry($client)['outcome'] ?? null);
     }
 
     public function testTheAuditLogIsReadableAsAResource(): void

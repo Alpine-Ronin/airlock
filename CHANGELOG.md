@@ -33,6 +33,14 @@ minor version may change the configuration and file formats.
   existing `commondir` names is kept like the git directory, and so is `config.worktree`, which git reads once
   `extensions.worktreeConfig` is set. A git directory a `.git` file or a `commondir` names stays kept even without its
   `HEAD`: a command could otherwise remove it in one run and plant a hook there in the next.
+- A command could move the project's `.git` directory aside, or a git directory a `.git` file points to, make a git
+  directory of its own in its place and plant hooks that git then ran outside the sandbox. A command can now write in
+  these directories but no longer move or remove them, nor the directories between them and the writable one holding
+  them.
+- Where git reaches its hooks or configuration through a symbolic link in a directory a command may write to, such as
+  `.git/hooks` linked to a folder of the repository, a command could replace the link with one of its own: the sandbox
+  keeps a link's target read-only, never the link. Airlock now runs no command there and names the link to replace; to
+  share hooks, set `core.hooksPath` instead.
 
 ## 0.3.5 (2026-11-05)
 

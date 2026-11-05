@@ -7,7 +7,6 @@ namespace App\Sandbox;
 use App\Configuration\ConfigDirectory;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Component\Filesystem\Path;
 
 /**
  * Where a confined command may write, what it gets a private copy of, and what it must not read or change.
@@ -170,6 +169,9 @@ final readonly class SandboxPaths
      * the next. Missing paths are made only in a git directory.
      *
      * @return list<string>
+     *
+     * @throws ReplaceableGitLinkException when git reaches one of these paths through a symbolic link a command could
+     *                                     replace
      */
     public function readOnlyInProject(string $projectDirectory): array
     {
@@ -179,16 +181,122 @@ final readonly class SandboxPaths
         }
         $isGitFile = is_file($dotGit);
         $readOnly = $isGitFile ? [$dotGit] : [];
-        $gitDirectories = $isGitFile ? $this->gitDirectoriesPointedToBy($dotGit) : $this->withCommonDirectory($dotGit);
-        foreach ($gitDirectories as $gitDirectory) {
+        foreach ($this->gitDirectoriesOf($dotGit) as $gitDirectory) {
             $isProjectGitDirectory = !$isGitFile && $gitDirectory === $dotGit;
             if ($isProjectGitDirectory || $this->isGitDirectory($gitDirectory)) {
                 $this->makeGitControl($gitDirectory);
             }
             array_push($readOnly, ...$this->gitControl($gitDirectory));
         }
+        $this->refuseReplaceableLinks([$dotGit, ...$readOnly], $this->writableRoots($projectDirectory));
 
         return $this->existing($readOnly);
+    }
+
+    /**
+     * Directories a command may write in but must not move or remove, parents first: each git directory the project's
+     * `.git` leads to, and those between it and the writable directory holding it. A command could otherwise move one
+     * aside and make a git directory of its own in its place, hooks and configuration included.
+     *
+     * @return list<string>
+     */
+    public function fixedInProject(string $projectDirectory): array
+    {
+        $dotGit = $projectDirectory.'/.git';
+        if (!is_dir($dotGit) && !is_file($dotGit)) {
+            return [];
+        }
+        $writableRoots = $this->writableRoots($projectDirectory);
+        $fixed = [];
+        foreach ($this->gitDirectoriesOf($dotGit) as $gitDirectory) {
+            array_push($fixed, ...$this->belowWritableRoot($this->resolved($gitDirectory), $writableRoots));
+        }
+        $fixed = array_unique($fixed);
+        sort($fixed, \SORT_STRING);
+
+        return $fixed;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function gitDirectoriesOf(string $dotGit): array
+    {
+        return is_file($dotGit) ? $this->gitDirectoriesPointedToBy($dotGit) : $this->withCommonDirectory($dotGit);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function writableRoots(string $projectDirectory): array
+    {
+        return [...$this->writable(), $this->resolved($projectDirectory)];
+    }
+
+    /**
+     * Every directory under the writable root holding $directory, down to $directory itself; none when no writable root
+     * holds it, as a command cannot move it then.
+     *
+     * @param list<string> $writableRoots
+     *
+     * @return list<string>
+     */
+    private function belowWritableRoot(string $directory, array $writableRoots): array
+    {
+        $root = $this->innermostRootOf($directory, $writableRoots);
+        if (null === $root || $root === $directory) {
+            return [];
+        }
+        $chain = [];
+        $current = rtrim($root, '/');
+        foreach (explode('/', substr($directory, \strlen($current) + 1)) as $name) {
+            $current .= '/'.$name;
+            $chain[] = $current;
+        }
+
+        return $chain;
+    }
+
+    /**
+     * @param list<string> $writableRoots
+     */
+    private function innermostRootOf(string $path, array $writableRoots): ?string
+    {
+        $innermost = null;
+        foreach ($writableRoots as $root) {
+            $isInnerHolder = $this->isWithin($path, $root) && (null === $innermost || \strlen($root) > \strlen($innermost));
+            if ($isInnerHolder) {
+                $innermost = $root;
+            }
+        }
+
+        return $innermost;
+    }
+
+    /**
+     * Refuses a symbolic link on the way to any of $paths, as git walks it, that sits in a writable directory: a bind
+     * mount or a Seatbelt rule protects the link's target, never the link.
+     *
+     * @param list<string> $paths
+     * @param list<string> $writableRoots
+     *
+     * @throws ReplaceableGitLinkException
+     */
+    private function refuseReplaceableLinks(array $paths, array $writableRoots): void
+    {
+        foreach ($paths as $path) {
+            $walked = '';
+            foreach (explode('/', $path) as $name) {
+                if ('' === $name) {
+                    continue;
+                }
+                $parent = '' === $walked ? '/' : $walked;
+                $walked .= '/'.$name;
+                if (is_link($walked) && null !== $this->innermostRootOf($this->resolved($parent), $writableRoots)) {
+                    throw new ReplaceableGitLinkException($walked);
+                }
+            }
+        }
     }
 
     private function makeGitControl(string $gitDirectory): void
@@ -206,11 +314,11 @@ final readonly class SandboxPaths
      */
     private function gitControl(string $gitDirectory): array
     {
-        return $this->existing([
+        return [
             ...$this->gitControlDirectories($gitDirectory),
             ...$this->gitControlFiles($gitDirectory),
             $gitDirectory.'/'.self::GIT_COMMON_DIRECTORY_FILE,
-        ]);
+        ];
     }
 
     /**
@@ -280,7 +388,7 @@ final readonly class SandboxPaths
 
     /**
      * The existing directory a line of a git file names, relative to $base unless absolute, or null when it names
-     * none.
+     * none. Its `..` are left for the system to resolve, as git does: one after a symbolic link leaves the link's target.
      */
     private function resolvedFrom(string $base, string $line): ?string
     {
@@ -288,7 +396,7 @@ final readonly class SandboxPaths
         if ('' === $path) {
             return null;
         }
-        $directory = Path::makeAbsolute($path, $base);
+        $directory = str_starts_with($path, '/') ? $path : $base.'/'.$path;
 
         return is_dir($directory) ? $directory : null;
     }
