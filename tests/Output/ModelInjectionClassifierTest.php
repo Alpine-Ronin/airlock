@@ -64,6 +64,21 @@ final class ModelInjectionClassifierTest extends TestCase
         self::assertTrue(RecordedResponses::at($request, 'response_format', 'json_schema', 'strict'));
     }
 
+    public function testAModelThatReasonsBeforeItAnswersHasRoomLeftToAnswer(): void
+    {
+        $body = null;
+        $httpClient = new MockHttpClient(static function (string $method, string $url, array $options) use (&$body): MockResponse {
+            $body = $options['body'] ?? null;
+
+            return RecordedResponses::fixture('output-check-clean');
+        });
+
+        $this->classifier($httpClient)->check("Build finished.\n");
+
+        self::assertIsString($body);
+        self::assertGreaterThanOrEqual(1000, RecordedResponses::at(json_decode($body, true, flags: \JSON_THROW_ON_ERROR), 'max_tokens'), 'A model that reasons first spends its tokens on reasoning, then on the verdict.');
+    }
+
     public function testALongOutputIsFlaggedWhenAnyOfItsChunksIs(): void
     {
         $httpClient = new MockHttpClient(static fn (string $method, string $url, array $options): MockResponse => RecordedResponses::fixture(

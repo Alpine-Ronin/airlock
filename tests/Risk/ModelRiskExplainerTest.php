@@ -50,6 +50,21 @@ final class ModelRiskExplainerTest extends TestCase
         self::assertSame(['summary'], RecordedResponses::at($request, 'response_format', 'json_schema', 'schema', 'required'));
     }
 
+    public function testAModelThatReasonsBeforeItAnswersHasRoomLeftToAnswer(): void
+    {
+        $body = null;
+        $httpClient = new MockHttpClient(static function (string $method, string $url, array $options) use (&$body): MockResponse {
+            $body = $options['body'] ?? null;
+
+            return RecordedResponses::fixture('plain-words');
+        });
+
+        $this->explainer($httpClient)->explain('rm -rf build');
+
+        self::assertIsString($body);
+        self::assertGreaterThanOrEqual(1000, RecordedResponses::at(json_decode($body, true, flags: \JSON_THROW_ON_ERROR), 'max_tokens'), 'A model that reasons first spends its tokens on reasoning, then on the line.');
+    }
+
     /**
      * @return iterable<string, array{string}>
      */

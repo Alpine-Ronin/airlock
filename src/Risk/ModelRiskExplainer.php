@@ -30,6 +30,12 @@ final readonly class ModelRiskExplainer implements RiskExplainer
 {
     public const int MAX_LENGTH = 120;
 
+    /**
+     * A model that reasons before it answers spends its tokens on the reasoning first, and some cannot be told not to:
+     * it needs room for both. A model that answers directly stops after the answer, and the timeout bounds the rest.
+     */
+    private const int ANSWER_TOKENS = 1024;
+
     private const string INSTRUCTIONS = <<<'TEXT'
         You tell a person, in one short line of plain words under 100 characters, what a shell command would do if
         they allowed it, for example "deletes build/ and everything in it".
@@ -78,7 +84,7 @@ final readonly class ModelRiskExplainer implements RiskExplainer
                 Message::forSystem(self::INSTRUCTIONS),
                 Message::ofUser(DataTag::wrap('command', $command)),
             ),
-            ['response_format' => PlainWords::class, 'max_tokens' => 60, 'temperature' => 0],
+            ['response_format' => PlainWords::class, 'max_tokens' => self::ANSWER_TOKENS, 'temperature' => 0],
         );
         $answer = $this->retries->read($ask(), $ask, static fn (DeferredResult $result): mixed => $result->asObject());
 
