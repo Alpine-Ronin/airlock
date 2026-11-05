@@ -210,6 +210,28 @@ final class ModelInjectionClassifierTest extends TestCase
         self::assertSame(1, $httpClient->getRequestsCount());
     }
 
+    public function testALostAnswerIsAskedForAgainOnlyOnceEveryOtherAnswerOfTheOutputIsRead(): void
+    {
+        $events = [];
+        $answers = ['output-check-clean', null, 'output-check-clean', 'output-check-injection'];
+        $httpClient = new MockHttpClient(static function () use (&$events, &$answers): MockResponse {
+            $index = \count(array_filter($events, static fn (string $event): bool => str_starts_with($event, 'ask')));
+            $events[] = 'ask '.$index;
+            $fixture = array_shift($answers);
+            $body = (static function () use (&$events, $index, $fixture): \Generator {
+                $events[] = 'read '.$index;
+                yield null === $fixture ? '' : (string) file_get_contents(RecordedResponses::DIRECTORY.'/'.$fixture.'.json');
+            })();
+
+            return new MockResponse($body, ['response_headers' => ['content-type' => 'application/json']]);
+        });
+
+        $check = $this->classifier($httpClient, new OutputChunker(chunkBytes: 64, overlapBytes: 8, maxChunks: 3))->check(str_repeat('Build step finished. ', 8));
+
+        self::assertSame(OutputVerdict::Injection, $check->verdict);
+        self::assertLessThan(array_search('ask 3', $events, true), array_search('read 2', $events, true), 'A request sent while another answer is unread makes the HTTP client fail: '.implode(', ', $events));
+    }
+
     public function testOnlyThePartsOfALongOutputWhoseAnswerWasLostAreAskedForAgain(): void
     {
         $responses = [RecordedResponses::fixture('output-check-clean'), self::lateAnswer(), RecordedResponses::fixture('output-check-injection')];

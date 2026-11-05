@@ -38,14 +38,48 @@ final readonly class ModelRetries
      */
     public function read(DeferredResult $answer, \Closure $ask, \Closure $read): mixed
     {
+        return $this->readAll([$answer], static fn (): DeferredResult => $ask(), $read)[0];
+    }
+
+    /**
+     * Reads every answer, then asks again, all together, for those that were lost, as many times as the retries allow.
+     * Asking again before every answer is read would send a request while others are still unread, which the HTTP
+     * client refuses.
+     *
+     * @template T
+     *
+     * @param list<DeferredResult>          $answers
+     * @param \Closure(int): DeferredResult $ask     asks the model again the question of the answer at that index
+     * @param \Closure(DeferredResult): T   $read
+     *
+     * @return list<T> the answers read, in their order
+     *
+     * @throws PlatformException|HttpClientException the last failure of the first answer still lost
+     */
+    public function readAll(array $answers, \Closure $ask, \Closure $read): array
+    {
+        $values = [];
+        $unread = array_keys($answers);
         for ($retry = 0;; ++$retry) {
-            try {
-                return $read($answer);
-            } catch (ServerException|TransportExceptionInterface $e) {
-                if ($retry >= $this->retries) {
-                    throw $e;
+            $failures = [];
+            foreach ($unread as $index) {
+                try {
+                    $values[$index] = $read($answers[$index]);
+                } catch (ServerException|TransportExceptionInterface $e) {
+                    $failures[$index] = $e;
                 }
-                $answer = $ask();
+            }
+            if ([] === $failures) {
+                ksort($values);
+
+                return array_values($values);
+            }
+            if ($retry >= $this->retries) {
+                throw array_first($failures);
+            }
+            $unread = array_keys($failures);
+            foreach ($unread as $index) {
+                $answers[$index] = $ask($index);
             }
         }
     }
