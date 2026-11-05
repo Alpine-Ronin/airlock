@@ -429,7 +429,7 @@ final class RunCommandOverStdioTest extends TestCase
         self::assertIsArray($tools);
         $names = array_column($tools, 'name');
         sort($names);
-        self::assertSame(['github_pr_checks', 'github_pr_comments', 'run_command'], $names);
+        self::assertSame(['github_open_pr', 'github_pr_checks', 'github_pr_comments', 'run_command'], $names);
     }
 
     /**
