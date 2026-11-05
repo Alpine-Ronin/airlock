@@ -16,6 +16,8 @@ minor version may change the configuration and file formats.
 - A model that did not answer within `AIRLOCK_AI_TIMEOUT` was reported as one that could not be reached, in the
   command's result, `airlock log` and `airlock configure`: it is now reported as not answering in time, and
   `airlock configure` no longer counts it as a model that answers.
+- A model that reasons before it answers, such as Mistral Large 4, ran out of room before its answer and was reported
+  as one that could not be reached: the output check and the plain-words line now leave it room to answer.
 
 ## 0.3.2 (2026-11-05)
 
