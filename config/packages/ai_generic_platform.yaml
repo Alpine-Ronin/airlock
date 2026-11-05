@@ -8,11 +8,12 @@ ai:
                 http_client: 'models.client'
                 supports_embeddings: false
 
-# A model that does not answer in time is no answer: the command's result never waits long for it.
+# A model that does not answer in time is no answer: the command's result never waits long for it. The idle timeout
+# alone bounds it: curl's own limit, max_duration, would end the request as a transport error, read as a model that
+# could not be reached.
 framework:
     http_client:
         scoped_clients:
             models.client:
                 scope: '.*'
                 timeout: '%env(float:AIRLOCK_AI_TIMEOUT)%'
-                max_duration: '%env(float:AIRLOCK_AI_TIMEOUT)%'

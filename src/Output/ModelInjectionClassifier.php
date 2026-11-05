@@ -7,7 +7,6 @@ namespace App\Output;
 use App\Configuration\ModelApi;
 use Psr\Log\LoggerInterface;
 use Symfony\AI\Platform\Exception\ExceptionInterface as PlatformException;
-use Symfony\AI\Platform\Exception\RateLimitExceededException;
 use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\PlatformInterface;
@@ -16,7 +15,6 @@ use Symfony\Component\DependencyInjection\Attribute\AsAlias;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\DependencyInjection\Attribute\Target;
 use Symfony\Contracts\HttpClient\Exception\ExceptionInterface as HttpClientException;
-use Symfony\Contracts\HttpClient\Exception\TimeoutExceptionInterface;
 
 /**
  * Asks a chat model, through Symfony AI's structured output, whether an output holds instructions aimed at the agent.
@@ -65,7 +63,7 @@ final readonly class ModelInjectionClassifier implements InjectionClassifier
             $answers = array_map(fn (string $chunk): DeferredResult => $this->ask($model, $chunk), $chunks->chunks);
             $labels = array_map($this->label(...), $answers);
         } catch (PlatformException|HttpClientException|\UnexpectedValueException $e) {
-            $reason = $this->reasonFor($e);
+            $reason = NotCheckedReason::forFailure($e);
             $this->logger->warning('Airlock could not check a command output: {reason}.', ['reason' => $reason->describe(), 'exception' => $e]);
 
             return OutputCheck::notChecked($reason);
@@ -99,14 +97,5 @@ final readonly class ModelInjectionClassifier implements InjectionClassifier
         }
 
         return $verdict->verdict;
-    }
-
-    private function reasonFor(PlatformException|HttpClientException|\UnexpectedValueException $e): NotCheckedReason
-    {
-        return match (true) {
-            $e instanceof RateLimitExceededException => NotCheckedReason::RateLimited,
-            $e instanceof TimeoutExceptionInterface => NotCheckedReason::Timeout,
-            default => NotCheckedReason::Error,
-        };
     }
 }
