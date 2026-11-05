@@ -47,6 +47,7 @@ jobs:
               run: |
                   composer global config --no-interaction allow-plugins.cyclonedx/cyclonedx-php-composer true
                   composer global require --no-interaction --no-progress cyclonedx/cyclonedx-php-composer:6.2.0
+                  mkdir -p build
                   composer CycloneDX:make-sbom --omit=dev --spec-version=1.6 --output-format=JSON --validate \
                     --mc-version="$SBOM_VERSION" --output-file=build/airlock.cdx.json
 
