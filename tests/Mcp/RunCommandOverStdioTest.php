@@ -294,6 +294,16 @@ final class RunCommandOverStdioTest extends TestCase
         self::assertSame('injection', $this->lastAuditEntry($client)['output_check'] ?? null);
     }
 
+    public function testACommandGetsNoGitHubTokenTheServerWasStartedWith(): void
+    {
+        $command = 'echo "[${GH_TOKEN-}${GITHUB_TOKEN-}${GH_ENTERPRISE_TOKEN-}${GITHUB_ENTERPRISE_TOKEN-}]"';
+        $client = $this->client(['GH_TOKEN' => 'gh-token', 'GITHUB_TOKEN' => 'github-token', 'GH_ENTERPRISE_TOKEN' => 'gh-enterprise', 'GITHUB_ENTERPRISE_TOKEN' => 'github-enterprise']);
+
+        $answer = $client->request($this->modernCall(2, $command, 'once', $this->askState($client, $command)));
+
+        self::assertStringContainsString("\n[]\n", $this->text($answer, 'result', 'content', 0, 'text'));
+    }
+
     public function testInTheModernEraACleanOutputIsNotFlagged(): void
     {
         $client = $this->client();

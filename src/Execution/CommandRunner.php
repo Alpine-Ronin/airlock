@@ -17,6 +17,12 @@ use Symfony\Component\Process\Process;
  */
 final readonly class CommandRunner
 {
+    /**
+     * The GitHub CLI's tokens, set when the client started Airlock with one: a command must not get a token it could
+     * copy, so only Airlock's own gh calls keep them.
+     */
+    private const array GITHUB_TOKENS = ['GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN'];
+
     /** What the agent gets back at most: the end of the output, where the result and the errors are. */
     private const int MAX_OUTPUT_BYTES = 64 * 1024;
 
@@ -54,23 +60,26 @@ final readonly class CommandRunner
      */
     public function runGitHubCli(array $arguments): CommandResult
     {
-        return $this->runProcess(['gh', ...$arguments]);
+        return $this->runProcess(['gh', ...$arguments], $this->withoutAirlockEnvironment());
     }
 
     private function runConfined(string $commandLine, ?SshAgent $sshAgent): CommandResult
     {
-        return $this->runProcess($this->sandboxDetector->detect()->confine(['bash', '-c', $commandLine], $this->projectDirectory->path, $sshAgent));
+        $command = $this->sandboxDetector->detect()->confine(['bash', '-c', $commandLine], $this->projectDirectory->path, $sshAgent);
+
+        return $this->runProcess($command, [...$this->withoutAirlockEnvironment(), ...array_fill_keys(self::GITHUB_TOKENS, false)]);
     }
 
     /**
-     * @param list<string> $command
+     * @param list<string>         $command
+     * @param array<string, false> $environment the variables to unset
      */
-    private function runProcess(array $command): CommandResult
+    private function runProcess(array $command, array $environment): CommandResult
     {
         $process = new Process(
             $command,
             cwd: $this->projectDirectory->path,
-            env: $this->withoutAirlockEnvironment(),
+            env: $environment,
             timeout: $this->timeoutSeconds,
         );
 
