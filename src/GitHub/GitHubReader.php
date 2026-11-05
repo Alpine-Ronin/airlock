@@ -75,14 +75,44 @@ final readonly class GitHubReader
         $result = $this->runner->runGitHubCli($call);
         $lines = explode("\n", trim($result->output));
         if (!$result->isSuccessful() || 2 !== \count($lines)) {
-            $check = $this->injectionClassifier->check($result->output);
-            $this->audit([$call], $result, $check);
-
-            throw new PullRequestNotFoundException($this->outputReport->result($result, $check));
+            throw new PullRequestNotFoundException($this->failedLookup($call, $result));
         }
         $this->audit([$call], $result);
 
         return PullRequest::fromUrl($lines[1]);
+    }
+
+    /**
+     * The repository the GitHub CLI finds for the project, the one `gh pr create` opens a pull request in.
+     *
+     * @throws RepositoryNotFoundException when the GitHub CLI finds none
+     * @throws GitHubReadException         when the GitHub CLI is not installed
+     */
+    public function repository(): Repository
+    {
+        $this->assertCliIsInstalled();
+        $call = ['repo', 'view', '--json', 'url,defaultBranchRef', '--jq', '.url, .defaultBranchRef.name'];
+        $result = $this->runner->runGitHubCli($call);
+        $lines = explode("\n", trim($result->output));
+        if (!$result->isSuccessful() || 2 !== \count($lines)) {
+            throw new RepositoryNotFoundException($this->failedLookup($call, $result));
+        }
+        $this->audit([$call], $result);
+
+        return Repository::fromUrl($lines[0], $lines[1]);
+    }
+
+    /**
+     * A lookup's failure as its output is reported, checked and in the audit log: gh's answer can name the branch.
+     *
+     * @param list<string> $call
+     */
+    private function failedLookup(array $call, CommandResult $result): CallToolResult
+    {
+        $check = $this->injectionClassifier->check($result->output);
+        $this->audit([$call], $result, $check);
+
+        return $this->outputReport->result($result, $check);
     }
 
     /**
