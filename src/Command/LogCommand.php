@@ -107,6 +107,7 @@ final class LogCommand extends Command
             Outcome::RanAndGrantedForProject => 'allowed always',
             Outcome::RanUnderGrant => 'ran under a grant',
             Outcome::Failed => 'failed',
+            Outcome::ReadFromGitHub => 'read from GitHub',
             null => '?',
         };
     }

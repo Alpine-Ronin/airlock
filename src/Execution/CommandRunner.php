@@ -46,12 +46,30 @@ final readonly class CommandRunner
         return $this->runConfined($commandLine, $hasAgent ? new SshAgent($this->sshAgentSocket) : null);
     }
 
+    /**
+     * Runs the GitHub CLI outside the sandbox, with the user's own login: only Airlock's GitHub tools call it, with
+     * arguments they build, never a command line the agent wrote.
+     *
+     * @param list<string> $arguments
+     */
+    public function runGitHubCli(array $arguments): CommandResult
+    {
+        return $this->runProcess(['gh', ...$arguments]);
+    }
+
     private function runConfined(string $commandLine, ?SshAgent $sshAgent): CommandResult
     {
-        $project = $this->projectDirectory->path;
+        return $this->runProcess($this->sandboxDetector->detect()->confine(['bash', '-c', $commandLine], $this->projectDirectory->path, $sshAgent));
+    }
+
+    /**
+     * @param list<string> $command
+     */
+    private function runProcess(array $command): CommandResult
+    {
         $process = new Process(
-            $this->sandboxDetector->detect()->confine(['bash', '-c', $commandLine], $project, $sshAgent),
-            cwd: $project,
+            $command,
+            cwd: $this->projectDirectory->path,
             env: $this->withoutAirlockEnvironment(),
             timeout: $this->timeoutSeconds,
         );

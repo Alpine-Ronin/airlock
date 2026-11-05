@@ -411,11 +411,15 @@ final class RunCommandOverStdioTest extends TestCase
         self::assertSame(InstalledVersions::getRootPackage()['pretty_version'], $this->field($answer, 'result', 'serverInfo', 'version'));
     }
 
-    public function testInTheHandshakeEraTheToolIsListed(): void
+    public function testInTheHandshakeEraTheToolsAreListed(): void
     {
         $answer = $this->handshakeClient()->request(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/list']);
 
-        self::assertSame('run_command', $this->field($answer, 'result', 'tools', 0, 'name'));
+        $tools = $this->field($answer, 'result', 'tools');
+        self::assertIsArray($tools);
+        $names = array_column($tools, 'name');
+        sort($names);
+        self::assertSame(['github_pr_checks', 'github_pr_comments', 'run_command'], $names);
     }
 
     /**
