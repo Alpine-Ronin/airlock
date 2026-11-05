@@ -77,13 +77,17 @@ verify_attestation() {
         printf 'Not checked where %s was built: releases before 0.3.4 have no attestation.\n' "$binary"
         return
     fi
-    if ! command -v gh > /dev/null 2>&1 || ! gh auth status > /dev/null 2>&1; then
+    if ! command -v gh > /dev/null 2>&1 || ! gh auth token --hostname github.com > /dev/null 2>&1; then
         printf 'Not checked where %s was built: with the GitHub CLI installed and logged in, this script checks it.\n' "$binary"
         return
     fi
+    gh attestation --help > /dev/null 2>&1 \
+        || fail "this GitHub CLI cannot check where $binary was built: update it to 2.49 or later, then install again"
+    gh auth status --hostname github.com --active > /dev/null 2>&1 \
+        || fail "the GitHub CLI's login to github.com does not work: run gh auth login, then install again"
     tag='v[0-9][^@]*'
     [ -z "$version" ] || tag="v$(printf '%s' "$version" | sed 's/\./\\./g')"
-    gh attestation verify "$1" --repo "$repository" --cert-identity-regex "^$(printf '%s' "$release_workflow" | sed 's/\./\\./g')@refs/tags/$tag\$" > /dev/null 2>&1 \
+    gh attestation verify "$1" --hostname github.com --repo "$repository" --cert-identity-regex "^$(printf '%s' "$release_workflow" | sed 's/\./\\./g')@refs/tags/$tag\$" > /dev/null 2>&1 \
         || fail "$binary has no attestation that this repository's release workflow built it: not installed"
     printf 'Checked: %s was built by the release workflow of %s.\n' "$binary" "$repository"
 }
