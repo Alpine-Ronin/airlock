@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Output;
 
 use App\Configuration\ModelApi;
+use App\Configuration\ModelRetries;
 use Psr\Log\LoggerInterface;
 use Symfony\AI\Platform\Exception\ExceptionInterface as PlatformException;
-use Symfony\AI\Platform\Exception\RateLimitExceededException;
 use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\PlatformInterface;
@@ -16,7 +16,6 @@ use Symfony\Component\DependencyInjection\Attribute\AsAlias;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\DependencyInjection\Attribute\Target;
 use Symfony\Contracts\HttpClient\Exception\ExceptionInterface as HttpClientException;
-use Symfony\Contracts\HttpClient\Exception\TimeoutExceptionInterface;
 
 /**
  * Asks a chat model, through Symfony AI's structured output, whether an output holds instructions aimed at the agent.
@@ -44,6 +43,7 @@ final readonly class ModelInjectionClassifier implements InjectionClassifier
         private OutputChunker $chunker,
         private LoggerInterface $logger,
         private ModelApi $modelApi,
+        private ModelRetries $retries,
         #[Autowire(env: 'model_setting:AIRLOCK_OUTPUT_CHECK_MODEL')]
         private string $model,
     ) {
@@ -63,9 +63,12 @@ final readonly class ModelInjectionClassifier implements InjectionClassifier
         $chunks = $this->chunker->split($output);
         try {
             $answers = array_map(fn (string $chunk): DeferredResult => $this->ask($model, $chunk), $chunks->chunks);
-            $labels = array_map($this->label(...), $answers);
+            $labels = [];
+            foreach ($chunks->chunks as $index => $chunk) {
+                $labels[] = $this->retries->read($answers[$index], fn (): DeferredResult => $this->ask($model, $chunk), $this->label(...));
+            }
         } catch (PlatformException|HttpClientException|\UnexpectedValueException $e) {
-            $reason = $this->reasonFor($e);
+            $reason = NotCheckedReason::forFailure($e);
             $this->logger->warning('Airlock could not check a command output: {reason}.', ['reason' => $reason->describe(), 'exception' => $e]);
 
             return OutputCheck::notChecked($reason);
@@ -99,14 +102,5 @@ final readonly class ModelInjectionClassifier implements InjectionClassifier
         }
 
         return $verdict->verdict;
-    }
-
-    private function reasonFor(PlatformException|HttpClientException|\UnexpectedValueException $e): NotCheckedReason
-    {
-        return match (true) {
-            $e instanceof RateLimitExceededException => NotCheckedReason::RateLimited,
-            $e instanceof TimeoutExceptionInterface => NotCheckedReason::Timeout,
-            default => NotCheckedReason::Error,
-        };
     }
 }

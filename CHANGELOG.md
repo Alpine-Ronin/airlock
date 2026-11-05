@@ -3,6 +3,20 @@
 What changed in each release, newest first. Versions follow [semantic versioning](https://semver.org): until 1.0, a
 minor version may change the configuration and file formats.
 
+## Unreleased
+
+### Added
+
+- A model whose answer did not come in time, or was lost to a server or network error, is asked once more before
+  Airlock goes on without it: `AIRLOCK_AI_RETRIES` sets how many times. A rate limit, or an answer that came but cannot
+  be used, is not asked again.
+
+### Fixed
+
+- A model that did not answer within `AIRLOCK_AI_TIMEOUT` was reported as one that could not be reached, in the
+  command's result, `airlock log` and `airlock configure`: it is now reported as not answering in time, and
+  `airlock configure` no longer counts it as a model that answers.
+
 ## 0.3.2 (2026-11-05)
 
 ### Security

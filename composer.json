@@ -6,6 +6,7 @@
     "require": {
         "php": ">=8.5",
         "ext-ctype": "*",
+        "ext-curl": "*",
         "ext-iconv": "*",
         "symfony/ai-bundle": "^1.0@beta",
         "symfony/ai-generic-platform": "^1.0@beta",

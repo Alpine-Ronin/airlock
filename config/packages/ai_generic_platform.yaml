@@ -8,7 +8,8 @@ ai:
                 http_client: 'models.client'
                 supports_embeddings: false
 
-# A model that does not answer in time is no answer: the command's result never waits long for it.
+# A model that does not answer in time is no answer: the command's result never waits long for it, neither for an
+# answer that does not start (timeout) nor for one that trickles in (max_duration).
 framework:
     http_client:
         scoped_clients:

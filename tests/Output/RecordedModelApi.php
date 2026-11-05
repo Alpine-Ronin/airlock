@@ -26,6 +26,12 @@ final readonly class RecordedModelApi
     /** A model that checks outputs well but whose rate limit stops it before the plain-words line. */
     public const string LIMITED_LINE = 'test/limited-line';
 
+    /** A model that never answers in time. */
+    public const string SLOW = 'test/slow';
+
+    /** A model that checks outputs well but does not write the plain-words line in time. */
+    public const string SLOW_LINE = 'test/slow-line';
+
     public function __construct(
         #[Autowire(env: 'model_setting:AIRLOCK_AI_BASE_URL')]
         private string $baseUrl,
@@ -54,6 +60,9 @@ final readonly class RecordedModelApi
         $schema = RecordedResponses::at($request, 'response_format', 'json_schema', 'name');
         if (self::LIMITED_LINE === $model && 'PlainWords' === $schema) {
             return RecordedResponses::fixture('rate-limited', 429);
+        }
+        if (self::SLOW === $model || (self::SLOW_LINE === $model && 'PlainWords' === $schema)) {
+            return new MockResponse(['']);
         }
         $content = RecordedResponses::at($request, 'messages', 1, 'content');
         $content = \is_string($content) ? $content : '';

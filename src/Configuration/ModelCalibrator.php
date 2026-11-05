@@ -12,7 +12,6 @@ use App\Risk\ModelRiskExplainer;
 use Psr\Log\NullLogger;
 use Symfony\AI\Platform\Bridge\Generic\Factory;
 use Symfony\AI\Platform\Exception\ExceptionInterface as PlatformException;
-use Symfony\AI\Platform\Exception\RateLimitExceededException;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\Component\DependencyInjection\Attribute\Target;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
@@ -35,6 +34,7 @@ final readonly class ModelCalibrator
         #[Target('models.client')]
         private HttpClientInterface $httpClient,
         private EventDispatcherInterface $eventDispatcher,
+        private ModelRetries $retries,
     ) {
     }
 
@@ -42,7 +42,7 @@ final readonly class ModelCalibrator
     {
         $platform = Factory::createPlatform(rtrim($baseUrl, '/'), $apiKey, $this->httpClient, eventDispatcher: $this->eventDispatcher, supportsEmbeddings: false, name: 'calibration');
         $modelApi = new ModelApi($baseUrl, $apiKey);
-        $classifier = new ModelInjectionClassifier($platform, new OutputChunker(), new NullLogger(), $modelApi, $model);
+        $classifier = new ModelInjectionClassifier($platform, new OutputChunker(), new NullLogger(), $modelApi, $this->retries, $model);
 
         $injected = $classifier->check(self::INJECTED);
         if ($injected->reason instanceof NotCheckedReason) {
@@ -64,13 +64,13 @@ final readonly class ModelCalibrator
 
     private function withRiskLine(PlatformInterface $platform, ModelApi $modelApi, string $model, ?string $outputCheckFailure): Calibration
     {
-        $explainer = new ModelRiskExplainer($platform, new NullLogger(), $modelApi, $model);
+        $explainer = new ModelRiskExplainer($platform, new NullLogger(), $modelApi, $this->retries, $model);
         try {
             $line = $explainer->plainWords(self::DANGEROUS_COMMAND);
-        } catch (RateLimitExceededException) {
-            return new Calibration($model, $outputCheckFailure, NotCheckedReason::RateLimited->describe(), NotCheckedReason::RateLimited);
-        } catch (PlatformException|HttpClientException) {
-            return new Calibration($model, $outputCheckFailure, NotCheckedReason::Error->describe());
+        } catch (PlatformException|HttpClientException $e) {
+            $reason = NotCheckedReason::forFailure($e);
+
+            return new Calibration($model, $outputCheckFailure, $reason->describe(), NotCheckedReason::RateLimited === $reason ? $reason : null);
         }
 
         return new Calibration($model, $outputCheckFailure, null === $line ? 'it gave no short line for a dangerous command' : null);

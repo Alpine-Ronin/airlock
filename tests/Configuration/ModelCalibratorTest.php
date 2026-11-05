@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Configuration;
 
 use App\Configuration\ModelCalibrator;
+use App\Configuration\ModelRetries;
 use App\Tests\Output\RecordedModelApi;
 use App\Tests\Output\RecordedResponses;
 use PHPUnit\Framework\TestCase;
@@ -56,11 +57,27 @@ final class ModelCalibratorTest extends TestCase
         self::assertTrue($calibration->passesOutputCheck());
     }
 
+    public function testAModelThatDoesNotAnswerInTimeIsUnanswered(): void
+    {
+        $calibration = $this->calibrator()->calibrate(RecordedResponses::BASE_URL, 'test-key', RecordedModelApi::SLOW);
+
+        self::assertSame('the model did not answer in time', $calibration->outputCheckFailure);
+        self::assertTrue($calibration->isUnanswered(), 'A model that does not answer in time does not count as one that answers.');
+    }
+
+    public function testAPlainWordsLineNotWrittenInTimeSaysSo(): void
+    {
+        $calibration = $this->calibrator()->calibrate(RecordedResponses::BASE_URL, 'test-key', RecordedModelApi::SLOW_LINE);
+
+        self::assertTrue($calibration->passesOutputCheck());
+        self::assertSame('the model did not answer in time', $calibration->riskLineFailure);
+    }
+
     private function calibrator(): ModelCalibrator
     {
         $dispatcher = new EventDispatcher();
         $dispatcher->addSubscriber(new PlatformSubscriber());
 
-        return new ModelCalibrator(new MockHttpClient(new RecordedModelApi(RecordedResponses::BASE_URL)), $dispatcher);
+        return new ModelCalibrator(new MockHttpClient(new RecordedModelApi(RecordedResponses::BASE_URL)), $dispatcher, new ModelRetries(1));
     }
 }
