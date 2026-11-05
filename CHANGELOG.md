@@ -11,6 +11,12 @@ minor version may change the configuration and file formats.
   repository's release workflow did not build, from the tag of the version asked for, is not installed. Releases
   before 0.3.4 have no attestation, so theirs is not checked.
 
+### Fixed
+
+- Since 0.3.3, a command whose output was checked in several parts, past 16 KB, failed with "Error while executing
+  tool" when the model's answer for one part was lost and asked again: the command had run, but the agent got no
+  output. Airlock now reads every part's answer before asking again for those lost.
+
 ## 0.3.4 (2026-11-05)
 
 ### Added
