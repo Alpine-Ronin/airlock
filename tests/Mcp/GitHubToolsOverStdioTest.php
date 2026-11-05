@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Mcp;
 
 use App\Mcp\OutputReport;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
@@ -328,7 +329,7 @@ final class GitHubToolsOverStdioTest extends TestCase
     public function testABranchThatIsNotPushedIsNotOpenedAndTheAgentIsToldToPushIt(): void
     {
         $this->git(['init', '-q', '-b', 'add-cart']);
-        $this->git(['-c', 'user.name=Airlock', '-c', 'user.email=airlock@example.invalid', 'commit', '-q', '--allow-empty', '-m', 'Start']);
+        $this->git(['-c', 'user.name=Airlock', '-c', 'user.email=airlock@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-q', '--allow-empty', '-m', 'Start']);
 
         $answer = $this->client()->request($this->call(1, 'github_open_pr', self::PULL_REQUEST));
 
@@ -343,6 +344,54 @@ final class GitHubToolsOverStdioTest extends TestCase
 
         self::assertTrue($this->field($answer, 'result', 'isError'));
         self::assertSame([], $this->ghCalls());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function titlesThatPassForSeveralLines(): iterable
+    {
+        yield 'a line feed' => ["Add the cart\nDraft: no"];
+        yield 'a vertical tab' => ["Add the cart\vDraft: no"];
+        yield 'a line separator' => ["Add the cart\u{2028}Draft: no"];
+        yield 'an escape sequence' => ["Add the cart\e[2K"];
+    }
+
+    #[DataProvider('titlesThatPassForSeveralLines')]
+    public function testATitleThatPassesForSeveralLinesIsRefusedWithoutCallingGitHub(string $title): void
+    {
+        $answer = $this->client()->request($this->call(1, 'github_open_pr', ['title' => $title, 'body' => '']));
+
+        self::assertTrue($this->field($answer, 'result', 'isError'));
+        self::assertSame([], $this->ghCalls());
+    }
+
+    public function testABaseWithAnUnicodeSpaceIsRefusedWithoutCallingGitHub(): void
+    {
+        $answer = $this->client()->request($this->call(1, 'github_open_pr', [...self::PULL_REQUEST, 'base' => "main\u{2029}x"]));
+
+        self::assertTrue($this->field($answer, 'result', 'isError'));
+        self::assertSame([], $this->ghCalls());
+    }
+
+    public function testABodyWithANullByteIsRefusedBeforeTheUserIsAsked(): void
+    {
+        $answer = $this->client()->request($this->call(1, 'github_open_pr', ['title' => 'Add the cart', 'body' => "Adds\0a cart."]));
+
+        self::assertTrue($this->field($answer, 'result', 'isError'), 'gh cannot be given a null byte: an approval would open nothing.');
+        self::assertSame([], $this->ghCalls());
+    }
+
+    public function testEveryLineOfTheBodyIsIndentedWhateverBreaksIt(): void
+    {
+        $this->pushBranch(withUpstream: true);
+
+        $answer = $this->client()->request($this->call(1, 'github_open_pr', ['title' => 'Add the cart', 'body' => "One\rDraft: no\u{2028}Two\u{0085}Three"]));
+
+        self::assertStringContainsString(
+            "Body:\n\n    One\n    Draft: no\n    Two\n    Three\n\n",
+            $this->text($this->field($answer, 'result', 'inputRequests', 'approval', 'params'), 'message'),
+        );
     }
 
     public function testWithoutTheGitHubCliNoPullRequestIsOpenedAndTheAgentIsToldWhy(): void
@@ -370,7 +419,7 @@ final class GitHubToolsOverStdioTest extends TestCase
     private function pushBranch(bool $withUpstream): void
     {
         $this->git(['init', '-q', '-b', 'add-cart']);
-        $this->git(['-c', 'user.name=Airlock', '-c', 'user.email=airlock@example.invalid', 'commit', '-q', '--allow-empty', '-m', 'Start']);
+        $this->git(['-c', 'user.name=Airlock', '-c', 'user.email=airlock@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-q', '--allow-empty', '-m', 'Start']);
         $this->git(['remote', 'add', 'origin', 'git@github.com:dev/app.git']);
         $this->git(['update-ref', 'refs/remotes/origin/add-cart', 'HEAD']);
         if ($withUpstream) {

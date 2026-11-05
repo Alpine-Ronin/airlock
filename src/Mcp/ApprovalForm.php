@@ -107,7 +107,9 @@ final readonly class ApprovalForm
             return '    (empty)';
         }
 
-        return '    '.implode("\n    ", explode("\n", rtrim(str_replace("\r\n", "\n", $text))));
+        $lines = preg_split('/\R/u', rtrim($text));
+
+        return '    '.implode("\n    ", false === $lines ? [rtrim($text)] : $lines);
     }
 
     private function whyAsked(Assessment $assessment, ?string $plainWords): string

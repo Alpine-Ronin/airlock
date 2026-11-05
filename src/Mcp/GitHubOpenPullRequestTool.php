@@ -40,7 +40,7 @@ final readonly class GitHubOpenPullRequestTool
      */
     public function __invoke(string $title, string $body, RequestContext $context, ?string $base = null, bool $draft = false): CallToolResult|InputRequiredResult
     {
-        $invalid = $this->invalidInput($title, $base);
+        $invalid = $this->invalidInput($title, $body, $base);
         if (null !== $invalid) {
             return CallToolResult::error([new TextContent($invalid.': no pull request was opened.')]);
         }
@@ -68,15 +68,19 @@ final readonly class GitHubOpenPullRequestTool
     }
 
     /**
-     * Why the title or base cannot be shown on one line of the form, or null when they can.
+     * Why the title or base cannot be shown on one line of the form, or the body cannot be given to gh, or null when
+     * they can. A control character or line separator could pass for a line of the form, or rewrite it in a terminal.
      */
-    private function invalidInput(string $title, ?string $base): ?string
+    private function invalidInput(string $title, string $body, ?string $base): ?string
     {
-        if ('' === trim($title) || 1 === preg_match('/[\r\n]/', $title)) {
-            return 'The title must be one line, not empty';
+        if ('' === trim($title) || 0 !== preg_match('/[\p{Cc}\p{Zl}\p{Zp}]/u', $title)) {
+            return 'The title must be one line, not empty, with no control character';
         }
-        if (null !== $base && ('' === trim($base) || 1 === preg_match('/\s/', $base))) {
+        if (null !== $base && ('' === trim($base) || 0 !== preg_match('/[\s\p{Cc}\p{Z}]/u', $base))) {
             return 'The base must be a branch name';
+        }
+        if (str_contains($body, "\0")) {
+            return 'The body must not hold a null byte';
         }
 
         return null;
