@@ -55,7 +55,8 @@ Each way ends with the command that starts the server. Your client runs it; you 
 Each [release](https://github.com/hbenabdallah/airlock/releases) holds one executable per platform, PHP 8.5 included:
 `airlock-macos-aarch64` (Apple Silicon), `airlock-linux-x86_64` and `airlock-linux-aarch64`, with their `SHA256SUMS`.
 The install script picks the one for this machine, checks it against `SHA256SUMS` and, when the
-[GitHub CLI](https://cli.github.com) is logged in, checks its attestation (see below), then puts it in `~/.local/bin`
+[GitHub CLI](https://cli.github.com) is logged in, checks its attestation (see below; releases before 0.3.4 have none,
+so theirs is not checked), then puts it in `~/.local/bin`
 (`AIRLOCK_INSTALL_DIR` to choose another directory). Read it first if you like: [install.sh](install.sh).
 
 ```bash

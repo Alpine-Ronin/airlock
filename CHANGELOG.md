@@ -8,7 +8,8 @@ minor version may change the configuration and file formats.
 ### Added
 
 - The install script checks where the binary was built when the GitHub CLI is logged in: a binary that this
-  repository's release workflow did not build, from the tag of the version asked for, is not installed.
+  repository's release workflow did not build, from the tag of the version asked for, is not installed. Releases
+  before 0.3.4 have no attestation, so theirs is not checked.
 
 ## 0.3.4 (2026-11-05)
 
