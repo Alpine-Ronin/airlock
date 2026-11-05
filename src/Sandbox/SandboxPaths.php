@@ -168,12 +168,15 @@ final readonly class SandboxPaths
      * it no longer looks like a git directory: a command could otherwise strip its HEAD in one run and plant a hook in
      * the next. Missing paths are made only in a git directory.
      *
+     * @param list<string> $alsoWritable directories the sandbox lets a command write to besides the project and
+     *                                   writable(), such as the temporary ones it does not make private
+     *
      * @return list<string>
      *
      * @throws ReplaceableGitLinkException when git reaches one of these paths through a symbolic link a command could
      *                                     replace
      */
-    public function readOnlyInProject(string $projectDirectory): array
+    public function readOnlyInProject(string $projectDirectory, array $alsoWritable): array
     {
         $dotGit = $projectDirectory.'/.git';
         if (!is_dir($dotGit) && !is_file($dotGit)) {
@@ -188,7 +191,7 @@ final readonly class SandboxPaths
             }
             array_push($readOnly, ...$this->gitControl($gitDirectory));
         }
-        $this->refuseReplaceableLinks([$dotGit, ...$readOnly], $this->writableRoots($projectDirectory));
+        $this->refuseReplaceableLinks([$dotGit, ...$readOnly], $this->writableRoots($projectDirectory, $alsoWritable));
 
         return $this->existing($readOnly);
     }
@@ -198,15 +201,17 @@ final readonly class SandboxPaths
      * `.git` leads to, and those between it and the writable directory holding it. A command could otherwise move one
      * aside and make a git directory of its own in its place, hooks and configuration included.
      *
+     * @param list<string> $alsoWritable as for readOnlyInProject()
+     *
      * @return list<string>
      */
-    public function fixedInProject(string $projectDirectory): array
+    public function fixedInProject(string $projectDirectory, array $alsoWritable): array
     {
         $dotGit = $projectDirectory.'/.git';
         if (!is_dir($dotGit) && !is_file($dotGit)) {
             return [];
         }
-        $writableRoots = $this->writableRoots($projectDirectory);
+        $writableRoots = $this->writableRoots($projectDirectory, $alsoWritable);
         $fixed = [];
         foreach ($this->gitDirectoriesOf($dotGit) as $gitDirectory) {
             array_push($fixed, ...$this->belowWritableRoot($this->resolved($gitDirectory), $writableRoots));
@@ -226,11 +231,13 @@ final readonly class SandboxPaths
     }
 
     /**
+     * @param list<string> $alsoWritable
+     *
      * @return list<string>
      */
-    private function writableRoots(string $projectDirectory): array
+    private function writableRoots(string $projectDirectory, array $alsoWritable): array
     {
-        return [...$this->writable(), $this->resolved($projectDirectory)];
+        return [...$this->writable(), ...array_map($this->resolved(...), $alsoWritable), $this->resolved($projectDirectory)];
     }
 
     /**

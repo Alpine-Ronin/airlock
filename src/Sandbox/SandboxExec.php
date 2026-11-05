@@ -46,16 +46,17 @@ final readonly class SandboxExec implements Sandbox
 
     private function profile(string $projectDirectory, bool $showsKnownHosts): string
     {
+        $temporary = [...$this->paths->private(), ...self::SYSTEM_WRITABLE];
         $writable = array_map(
             fn (string $path): string => \sprintf('(subpath %s)', $this->quote($path)),
-            [...$this->paths->writable(), ...$this->paths->private(), $projectDirectory, ...self::SYSTEM_WRITABLE],
+            [...$this->paths->writable(), ...$temporary, $projectDirectory],
         );
         // Seatbelt applies the last rule that matches: the denials come after the allowances they narrow.
         $rules = ['(version 1)', '(allow default)', '(deny file-write*)', '(allow file-write* '.implode(' ', $writable).')'];
-        foreach ($this->paths->readOnlyInProject($projectDirectory) as $readOnly) {
+        foreach ($this->paths->readOnlyInProject($projectDirectory, $temporary) as $readOnly) {
             $rules[] = \sprintf('(deny file-write* (subpath %s))', $this->quote($readOnly));
         }
-        foreach ($this->paths->fixedInProject($projectDirectory) as $fixed) {
+        foreach ($this->paths->fixedInProject($projectDirectory, $temporary) as $fixed) {
             $rules[] = \sprintf('(deny file-write-unlink (literal %s))', $this->quote($fixed));
         }
         foreach ($this->paths->hidden() as $hidden) {
