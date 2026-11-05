@@ -138,19 +138,18 @@ Done: the parser, the policy, both sandboxes, the form and its grants, the
 audit log, rotated past a size, the model checks, `airlock connect` for five
 clients, three of them run end to end, grants and recent decisions from the
 terminal (`airlock grants`, `airlock log`), `airlock doctor`, and a static
-binary per platform.
+binary per platform, and reading a pull request's checks and comments for the
+agent (`github_pr_checks`, `github_pr_comments`): Airlock runs the user's `gh`
+itself, outside the sandbox, as a command never gets a token it could copy;
+what it reads comes back as an output does, checked for injection, marked as
+data, secrets masked.
 
 Next, in this order:
 
 - Cursor and VS Code run end to end, as the others were.
-- GitHub actions Airlock runs itself, outside the sandbox, with the user's
-  existing `gh` login: open a pull request, read its checks, read its review
-  comments. A command never gets a token it could copy, so `gh` cannot run
-  inside the sandbox; these tools give the agent what it needs without one.
-  Opening a pull request goes through the form like any command; checks and
-  comments are read without asking, but come back as an output does: checked
-  for injection, marked as data, secrets masked. Only GitHub, only these
-  actions: any other service keeps the rule that its commands are the user's.
+- Opening a pull request the same way, through the form like any command,
+  every time. Only GitHub, only these actions: any other service keeps the rule
+  that its commands are the user's.
 - A signed and notarized macOS binary, so that Gatekeeper opens it without a
   warning. Releases already prove where they come from: each binary is attested
   with its build provenance and an SBOM.

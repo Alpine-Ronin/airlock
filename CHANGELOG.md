@@ -3,6 +3,22 @@
 What changed in each release, newest first. Versions follow [semantic versioning](https://semver.org): until 1.0, a
 minor version may change the configuration and file formats.
 
+## Unreleased
+
+### Added
+
+- `github_pr_checks` and `github_pr_comments`: the agent reads a pull request's CI checks, and its reviews and
+  comments, line comments included. Airlock runs the user's GitHub CLI itself, outside the sandbox and without asking,
+  and gives back what it read as a command's output: secrets masked, checked for prompt injection, marked as data,
+  in the audit log as `read_from_github`.
+
+### Security
+
+- A command got the GitHub CLI's token when the client started Airlock with one in its environment (`GH_TOKEN`,
+  `GITHUB_TOKEN`, or their Enterprise forms): an approved command could use it or copy it. Commands no longer get
+  these variables; only Airlock's own GitHub reads use them, and never the Enterprise ones, which gh sends to any host
+  the repository names.
+
 ## 0.3.5 (2026-11-05)
 
 ### Added

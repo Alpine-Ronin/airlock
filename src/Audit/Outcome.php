@@ -16,4 +16,5 @@ enum Outcome: string
     case RanAndGrantedForProject = 'ran_and_granted_for_project';
     case RanUnderGrant = 'ran_under_grant';
     case Failed = 'failed';
+    case ReadFromGitHub = 'read_from_github';
 }

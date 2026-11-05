@@ -294,6 +294,16 @@ final class RunCommandOverStdioTest extends TestCase
         self::assertSame('injection', $this->lastAuditEntry($client)['output_check'] ?? null);
     }
 
+    public function testACommandGetsNoGitHubTokenTheServerWasStartedWith(): void
+    {
+        $command = 'echo "[${GH_TOKEN-}${GITHUB_TOKEN-}${GH_ENTERPRISE_TOKEN-}${GITHUB_ENTERPRISE_TOKEN-}]"';
+        $client = $this->client(['GH_TOKEN' => 'gh-token', 'GITHUB_TOKEN' => 'github-token', 'GH_ENTERPRISE_TOKEN' => 'gh-enterprise', 'GITHUB_ENTERPRISE_TOKEN' => 'github-enterprise']);
+
+        $answer = $client->request($this->modernCall(2, $command, 'once', $this->askState($client, $command)));
+
+        self::assertStringContainsString("\n[]\n", $this->text($answer, 'result', 'content', 0, 'text'));
+    }
+
     public function testInTheModernEraACleanOutputIsNotFlagged(): void
     {
         $client = $this->client();
@@ -411,11 +421,15 @@ final class RunCommandOverStdioTest extends TestCase
         self::assertSame(InstalledVersions::getRootPackage()['pretty_version'], $this->field($answer, 'result', 'serverInfo', 'version'));
     }
 
-    public function testInTheHandshakeEraTheToolIsListed(): void
+    public function testInTheHandshakeEraTheToolsAreListed(): void
     {
         $answer = $this->handshakeClient()->request(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/list']);
 
-        self::assertSame('run_command', $this->field($answer, 'result', 'tools', 0, 'name'));
+        $tools = $this->field($answer, 'result', 'tools');
+        self::assertIsArray($tools);
+        $names = array_column($tools, 'name');
+        sort($names);
+        self::assertSame(['github_pr_checks', 'github_pr_comments', 'run_command'], $names);
     }
 
     /**
