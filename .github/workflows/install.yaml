@@ -1,7 +1,8 @@
 name: install
 
 # install.sh, run as a user runs it, against a release served locally: the platform is detected, a version is picked,
-# and a binary that does not match SHA256SUMS is refused.
+# and a binary that does not match SHA256SUMS, or that the GitHub CLI finds no attestation for, is refused. Then against
+# a real release, whose attestation it checks.
 on:
     pull_request:
         paths:
@@ -11,6 +12,7 @@ on:
 
 permissions:
     contents: read
+    attestations: read
 
 jobs:
     install:
@@ -49,6 +51,13 @@ jobs:
             - name: Install a given version
               run: sh -s -- 1.0.0 < install.sh && test "$(cat installed/airlock)" = one
 
+            - name: Refuse a binary with no attestation, when the GitHub CLI can check it
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  if sh install.sh; then exit 1; fi
+                  test "$(cat installed/airlock)" = one
+
             - name: Refuse a binary that does not match its checksum
               run: |
                   for target in linux-x86_64 linux-aarch64 macos-aarch64; do echo tampered > "releases/latest/download/airlock-$target"; done
@@ -57,3 +66,11 @@ jobs:
 
             - name: Refuse a version that does not exist
               run: if sh install.sh 9.9.9; then exit 1; fi
+
+            - name: Check where a real release was built
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  AIRLOCK_RELEASES_URL: ''
+              run: |
+                  sh install.sh 0.3.4 | tee install.log
+                  grep -q '^Checked: ' install.log
