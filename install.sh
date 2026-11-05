@@ -71,6 +71,17 @@ predates_attestations() {
     [ "${major:-0}" -eq 0 ] && { [ "${minor:-0}" -lt 3 ] || { [ "${minor:-0}" -eq 3 ] && [ "${patch:-0}" -lt 4 ]; }; }
 }
 
+# Whether the GitHub CLI has COMMAND (the words before --) with the FLAG after it.
+gh_supports() {
+    command=''
+    while [ "$1" != -- ]; do
+        command="$command $1"
+        shift
+    done
+    # shellcheck disable=SC2086 # the command's words are meant to split
+    gh $command --help 2> /dev/null | grep -q -e "$2"
+}
+
 # Checks that the release workflow built the binary, from the tag of VERSION or, without one, from a version tag.
 verify_attestation() {
     if [ -n "$version" ] && predates_attestations "$version"; then
@@ -81,8 +92,10 @@ verify_attestation() {
         printf 'Not checked where %s was built: with the GitHub CLI installed and logged in, this script checks it.\n' "$binary"
         return
     fi
-    gh attestation --help > /dev/null 2>&1 \
-        || fail "this GitHub CLI cannot check where $binary was built: update it to 2.49 or later, then install again"
+    if ! gh_supports attestation verify -- --cert-identity-regex || ! gh_supports attestation verify -- --hostname \
+        || ! gh_supports auth status -- --active; then
+        fail "this GitHub CLI is too old to check where $binary was built: update it, then install again"
+    fi
     gh auth status --hostname github.com --active > /dev/null 2>&1 \
         || fail "the GitHub CLI's login to github.com does not work: run gh auth login, then install again"
     tag='v[0-9][^@]*'
