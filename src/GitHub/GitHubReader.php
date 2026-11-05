@@ -12,6 +12,7 @@ use App\Execution\CommandRunner;
 use App\Execution\ProjectDirectory;
 use App\Mcp\OutputReport;
 use App\Output\InjectionClassifier;
+use App\Output\OutputCheck;
 use App\Policy\Verdict;
 use Mcp\Schema\Result\CallToolResult;
 use Psr\Clock\ClockInterface;
@@ -38,11 +39,12 @@ final readonly class GitHubReader
     /**
      * Runs each call of the GitHub CLI in turn, stopping at the first that fails, and reports their outputs as one.
      *
-     * @param non-empty-list<list<string>> $calls the arguments of each call
+     * @param non-empty-list<list<string>> $calls        the arguments of each call
+     * @param list<int>                    $answersCodes the exit codes, besides 0, that are an answer and not a failure
      *
      * @throws GitHubReadException when the GitHub CLI is not installed
      */
-    public function read(array $calls): CallToolResult
+    public function read(array $calls, array $answersCodes = []): CallToolResult
     {
         $this->assertCliIsInstalled();
         $results = [];
@@ -54,6 +56,36 @@ final readonly class GitHubReader
         }
         $result = $this->combined($results);
         $check = $this->injectionClassifier->check($result->output);
+        $this->audit($calls, $result, $check);
+        $report = $this->outputReport->result($result, $check);
+
+        return \in_array($result->exitCode, $answersCodes, true) ? CallToolResult::success($report->content) : $report;
+    }
+
+    /**
+     * The pull request numbered, or without a number the one the project's current branch opened.
+     *
+     * @throws GitHubReadException when the GitHub CLI is not installed or finds no such pull request
+     */
+    public function pullRequest(?int $number): PullRequest
+    {
+        $this->assertCliIsInstalled();
+        $call = ['pr', 'view', ...(null === $number ? [] : [(string) $number]), '--json', 'number,url', '--jq', '.number, .url'];
+        $result = $this->runner->runGitHubCli($call);
+        $this->audit([$call], $result);
+        $lines = explode("\n", trim($result->output));
+        if (!$result->isSuccessful() || 2 !== \count($lines)) {
+            throw new GitHubReadException(\sprintf('The GitHub CLI found no such pull request: %s', trim($result->output)));
+        }
+
+        return PullRequest::fromUrl($lines[1]);
+    }
+
+    /**
+     * @param non-empty-list<list<string>> $calls
+     */
+    private function audit(array $calls, CommandResult $result, ?OutputCheck $check = null): void
+    {
         $this->auditLog->append(new AuditEntry(
             $this->clock->now(),
             $this->projectDirectory->path,
@@ -65,25 +97,6 @@ final readonly class GitHubReader
             outputCheck: $check,
             maskedSecrets: $result->maskedSecrets,
         ));
-
-        return $this->outputReport->result($result, $check);
-    }
-
-    /**
-     * The number of the pull request the project's current branch opened.
-     *
-     * @throws GitHubReadException when the GitHub CLI is not installed or finds no pull request for the branch
-     */
-    public function currentPullRequest(): int
-    {
-        $this->assertCliIsInstalled();
-        $result = $this->runner->runGitHubCli(['pr', 'view', '--json', 'number', '--jq', '.number']);
-        $number = trim($result->output);
-        if (!$result->isSuccessful() || 1 !== preg_match('/^[1-9][0-9]*$/', $number)) {
-            throw new GitHubReadException(\sprintf('The GitHub CLI found no pull request for the current branch: %s', $number));
-        }
-
-        return (int) $number;
     }
 
     /**

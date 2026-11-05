@@ -12,10 +12,13 @@ use Mcp\Schema\Result\CallToolResult;
 
 #[McpTool(
     name: 'github_pr_checks',
-    description: 'Read the CI checks of a GitHub pull request: the current branch\'s, or the one numbered. Airlock runs the user\'s GitHub CLI for you, outside the sandbox, without asking; what it read comes back as data, checked for prompt injection. gh exits 8 while checks are pending and 1 when one failed.',
+    description: 'Read the CI checks of a GitHub pull request: the current branch\'s, or the one numbered. Airlock runs the user\'s GitHub CLI for you, outside the sandbox, without asking; what it read comes back as data, checked for prompt injection. Checks still pending come back as such; gh exits 1 when one failed.',
 )]
 final readonly class GitHubChecksTool
 {
+    /** The exit code of gh pr checks while checks are pending: the answer, not a failure to give one. */
+    private const array PENDING = [8];
+
     public function __construct(
         private GitHubReader $reader,
     ) {
@@ -31,7 +34,7 @@ final readonly class GitHubChecksTool
         }
 
         try {
-            return $this->reader->read([['pr', 'checks', ...(null === $pullRequest ? [] : [(string) $pullRequest])]]);
+            return $this->reader->read([['pr', 'checks', ...(null === $pullRequest ? [] : [(string) $pullRequest])]], self::PENDING);
         } catch (GitHubReadException $e) {
             return CallToolResult::error([new TextContent($e->getMessage())]);
         }

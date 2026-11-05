@@ -34,11 +34,11 @@ final readonly class GitHubCommentsTool
         }
 
         try {
-            $number = (string) ($pullRequest ?? $this->reader->currentPullRequest());
+            $found = $this->reader->pullRequest($pullRequest);
 
             return $this->reader->read([
-                ['pr', 'view', $number, '--comments'],
-                ['api', 'repos/{owner}/{repo}/pulls/'.$number.'/comments', '--paginate', '--jq', self::LINE_COMMENTS],
+                ['pr', 'view', (string) $found->number, '--comments'],
+                ['api', '--hostname', $found->host, \sprintf('repos/%s/pulls/%d/comments', $found->repository, $found->number), '--paginate', '--jq', self::LINE_COMMENTS],
             ]);
         } catch (GitHubReadException $e) {
             return CallToolResult::error([new TextContent($e->getMessage())]);
