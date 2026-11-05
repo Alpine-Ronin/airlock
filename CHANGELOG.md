@@ -7,19 +7,24 @@ minor version may change the configuration and file formats.
 
 ### Added
 
-- The install script checks where the binary was built when the GitHub CLI is logged in: a binary that this
-  repository's release workflow did not build, from the tag of the version asked for, is not installed. Releases
-  before 0.3.4 have no attestation, so theirs is not checked.
 - `github_pr_checks` and `github_pr_comments`: the agent reads a pull request's CI checks, and its reviews and
   comments, line comments included. Airlock runs the user's GitHub CLI itself, outside the sandbox and without asking,
   and gives back what it read as a command's output: secrets masked, checked for prompt injection, marked as data,
   in the audit log as `read_from_github`.
 
+## 0.3.5 (2026-11-05)
+
+### Added
+
+- The install script checks where the binary was built when the GitHub CLI is logged in: a binary that this
+  repository's release workflow did not build, from the tag of the version asked for, is not installed. Releases
+  before 0.3.4 have no attestation, so theirs is not checked (#54).
+
 ### Fixed
 
 - Since 0.3.3, a command whose output was checked in several parts, past 16 KB, failed with "Error while executing
   tool" when the model's answer for one part was lost and asked again: the command had run, but the agent got no
-  output. Airlock now reads every part's answer before asking again for those lost.
+  output. Airlock now reads every part's answer before asking again for those lost (#55).
 
 ## 0.3.4 (2026-11-05)
 
