@@ -1,6 +1,7 @@
 #!/bin/sh
 # Installs the Airlock binary for this machine from the project's GitHub releases, after checking it against the
-# release's SHA256SUMS.
+# release's SHA256SUMS and, with the GitHub CLI logged in, its attestation: that this repository's release workflow
+# built it, from the release's tag.
 #
 #   curl -fsSL https://raw.githubusercontent.com/hbenabdallah/airlock/main/install.sh | sh
 #   curl -fsSL https://raw.githubusercontent.com/hbenabdallah/airlock/main/install.sh | sh -s -- 1.0.0
@@ -9,6 +10,8 @@
 set -eu
 
 releases="${AIRLOCK_RELEASES_URL:-https://github.com/hbenabdallah/airlock/releases}"
+repository=hbenabdallah/airlock
+release_workflow="https://github.com/$repository/.github/workflows/binaries.yaml"
 install_dir="${AIRLOCK_INSTALL_DIR:-$HOME/.local/bin}"
 
 fail() {
@@ -57,13 +60,45 @@ sha256() {
     fi
 }
 
+# Whether VERSION (1.2.3) is older than 0.3.4, the first release whose binaries are attested.
+predates_attestations() {
+    case "$1" in
+        *[!0-9.]* | '') return 1 ;;
+    esac
+    major="$(printf '%s' "$1" | cut -d . -f 1)"
+    minor="$(printf '%s' "$1" | cut -d . -f 2)"
+    patch="$(printf '%s' "$1" | cut -d . -f 3)"
+    [ "${major:-0}" -eq 0 ] && { [ "${minor:-0}" -lt 3 ] || { [ "${minor:-0}" -eq 3 ] && [ "${patch:-0}" -lt 4 ]; }; }
+}
+
+# Checks that the release workflow built the binary, from the tag of VERSION or, without one, from a version tag.
+verify_attestation() {
+    if [ -n "$version" ] && predates_attestations "$version"; then
+        printf 'Not checked where %s was built: releases before 0.3.4 have no attestation.\n' "$binary"
+        return
+    fi
+    if ! command -v gh > /dev/null 2>&1 || ! gh auth status > /dev/null 2>&1; then
+        printf 'Not checked where %s was built: with the GitHub CLI installed and logged in, this script checks it.\n' "$binary"
+        return
+    fi
+    tag='v[0-9][^@]*'
+    [ -z "$version" ] || tag="v$(printf '%s' "$version" | sed 's/\./\\./g')"
+    gh attestation verify "$1" --repo "$repository" --cert-identity-regex "^$(printf '%s' "$release_workflow" | sed 's/\./\\./g')@refs/tags/$tag\$" > /dev/null 2>&1 \
+        || fail "$binary has no attestation that this repository's release workflow built it: not installed"
+    printf 'Checked: %s was built by the release workflow of %s.\n' "$binary" "$repository"
+}
+
+version=''
 case "${1:-}" in
     -h | --help)
         usage
         exit 0
         ;;
     '') base="$releases/latest/download" ;;
-    *) base="$releases/download/v${1#v}" ;;
+    *)
+        version="${1#v}"
+        base="$releases/download/v$version"
+        ;;
 esac
 
 binary="airlock-$(target)"
@@ -77,6 +112,7 @@ download "$base/SHA256SUMS" "$work/SHA256SUMS" || fail "could not download $base
 expected="$(awk -v name="$binary" '$2 == name || $2 == "*" name { print $1 }' "$work/SHA256SUMS")"
 [ -n "$expected" ] || fail "SHA256SUMS lists no $binary"
 [ "$(sha256 "$work/$binary")" = "$expected" ] || fail "$binary does not match its checksum: not installed"
+verify_attestation "$work/$binary"
 
 mkdir -p "$install_dir"
 chmod +x "$work/$binary"
