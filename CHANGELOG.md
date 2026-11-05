@@ -11,6 +11,11 @@ minor version may change the configuration and file formats.
   comments, line comments included. Airlock runs the user's GitHub CLI itself, outside the sandbox and without asking,
   and gives back what it read as a command's output: secrets masked, checked for prompt injection, marked as data,
   in the audit log as `read_from_github`.
+- `github_open_pr`: the agent opens a pull request from the current branch, with a title, a body, and optionally a base
+  and as a draft. The user is asked every time and can only allow it once or refuse; the form shows the repository,
+  the branch and its base, the title, whether it is a draft, and the body. Airlock builds the `gh pr create` call
+  itself, never pushes (a branch not yet pushed is refused, saying to push it first), and gives back what gh printed as
+  a command's output; in the audit log as `opened_on_github` or `refused_by_user`.
 
 ### Security
 
