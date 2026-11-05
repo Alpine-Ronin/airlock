@@ -7,6 +7,7 @@ namespace App\Sandbox;
 use App\Configuration\ConfigDirectory;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Filesystem\Path;
 
 /**
  * Where a confined command may write, what it gets a private copy of, and what it must not read or change.
@@ -31,10 +32,13 @@ final readonly class SandboxPaths
     /** Under Airlock's own directory, what holds its secrets. */
     private const array AIRLOCK_SECRETS = ['.env.local', '.env.*.local', 'config/secrets'];
 
-    /** Under the project, what git runs or obeys outside the sandbox, later, as the user: directories, then files. */
-    private const array GIT_CONTROL_DIRECTORIES = ['.git/hooks'];
+    /** Under a git directory, what git runs or obeys outside the sandbox, later, as the user: directories, then files. */
+    private const array GIT_CONTROL_DIRECTORIES = ['hooks'];
 
-    private const array GIT_CONTROL_FILES = ['.git/config'];
+    private const array GIT_CONTROL_FILES = ['config'];
+
+    /** How a `.git` file starts: a linked worktree, or a repository made with `--separate-git-dir`. */
+    private const string GIT_FILE_POINTER = 'gitdir: ';
 
     public function __construct(
         #[Autowire(env: 'HOME')]
@@ -151,22 +155,82 @@ final readonly class SandboxPaths
     }
 
     /**
-     * Paths of the project a command may read but not change. In a git repository, those git would otherwise create
-     * are made first, empty, as `git init` makes them: a path that does not exist cannot be kept read-only, and a
-     * command could plant it.
+     * Paths of the project's repository a command may read but not change. In a git directory, those git would
+     * otherwise create are made first, empty, as `git init` makes them: a path that does not exist cannot be kept
+     * read-only, and a command could plant it. When `.git` is a file, it is kept too, with the git directory it points
+     * to and the common one that directory shares, wherever they are: a command could otherwise point it at a git
+     * directory of its own making.
      *
      * @return list<string>
      */
     public function readOnlyInProject(string $projectDirectory): array
     {
-        $directories = array_map(static fn (string $control): string => $projectDirectory.'/'.$control, self::GIT_CONTROL_DIRECTORIES);
-        $files = array_map(static fn (string $control): string => $projectDirectory.'/'.$control, self::GIT_CONTROL_FILES);
-        if (is_dir($projectDirectory.'/.git')) {
-            $this->filesystem->mkdir($directories);
-            $this->filesystem->touch($files);
+        $dotGit = $projectDirectory.'/.git';
+        if (is_dir($dotGit)) {
+            return $this->gitControl($dotGit);
+        }
+        if (!is_file($dotGit)) {
+            return [];
+        }
+        $readOnly = [$dotGit];
+        foreach ($this->gitDirectoriesPointedToBy($dotGit) as $gitDirectory) {
+            array_push($readOnly, ...$this->gitControl($gitDirectory));
         }
 
+        return $this->existing($readOnly);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function gitControl(string $gitDirectory): array
+    {
+        $directories = array_map(static fn (string $control): string => $gitDirectory.'/'.$control, self::GIT_CONTROL_DIRECTORIES);
+        $files = array_map(static fn (string $control): string => $gitDirectory.'/'.$control, self::GIT_CONTROL_FILES);
+        $this->filesystem->mkdir($directories);
+        $this->filesystem->touch($files);
+
         return $this->existing([...$directories, ...$files]);
+    }
+
+    /**
+     * The existing git directory a `.git` file points to, then the common directory it names in `commondir`, as git
+     * resolves them: each relative to the file that names it.
+     *
+     * @return list<string>
+     */
+    private function gitDirectoriesPointedToBy(string $gitFile): array
+    {
+        $pointer = $this->filesystem->readFile($gitFile);
+        if (!str_starts_with($pointer, self::GIT_FILE_POINTER)) {
+            return [];
+        }
+        $gitDirectory = $this->resolvedFrom(\dirname($gitFile), substr($pointer, \strlen(self::GIT_FILE_POINTER)));
+        if (null === $gitDirectory) {
+            return [];
+        }
+        $commonDirectoryFile = $gitDirectory.'/commondir';
+        if (!is_file($commonDirectoryFile)) {
+            return [$gitDirectory];
+        }
+        $commonDirectory = $this->resolvedFrom($gitDirectory, $this->filesystem->readFile($commonDirectoryFile));
+
+        return null === $commonDirectory ? [$gitDirectory] : [$gitDirectory, $commonDirectory];
+    }
+
+    /**
+     * The existing directory a line of a git file names, relative to $base unless absolute, or null when it names
+     * none.
+     */
+    private function resolvedFrom(string $base, string $line): ?string
+    {
+        $path = rtrim($line, "\r\n");
+        if ('' === $path) {
+            return null;
+        }
+        $directory = Path::makeAbsolute($path, $base);
+
+        return is_dir($directory) ? $directory : null;
     }
 
     /**

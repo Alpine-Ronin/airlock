@@ -10,6 +10,7 @@ use App\Sandbox\SandboxPaths;
 use App\Sandbox\SshAgent;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Process\Process;
 
 /**
  * The macOS profile, read rather than run: sandbox-exec only exists on macOS.
@@ -56,6 +57,22 @@ final class SandboxExecTest extends TestCase
         }
         self::assertStringContainsString(\sprintf('(allow file-read* (literal "%s/.ssh/known_hosts"))', $home), $profile);
         self::assertStringNotContainsString('(allow file-write* (literal', $profile, 'A command must not vouch for a forged server.');
+    }
+
+    public function testAWorktreesGitFileAndItsRepositorysHooksAndConfigurationAreDeniedWrites(): void
+    {
+        $repository = self::HOME.'/repository';
+        new Filesystem()->mkdir($repository);
+        new Process(['git', 'init', '-q'], $repository)->mustRun();
+        new Process(['git', '-c', 'user.name=Airlock', '-c', 'user.email=airlock@example.invalid', 'commit', '-q', '--allow-empty', '-m', 'Start'], $repository)->mustRun();
+        new Process(['git', 'worktree', 'add', '-q', self::HOME.'/worktree'], $repository)->mustRun();
+        $home = (string) realpath(self::HOME);
+
+        $profile = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), cutsNetwork: false)->confine(['true'], $home.'/worktree')[2];
+
+        foreach (['/worktree/.git', '/repository/.git/hooks', '/repository/.git/config', '/repository/.git/worktrees/worktree/hooks', '/repository/.git/worktrees/worktree/config'] as $readOnly) {
+            self::assertStringContainsString(\sprintf('(deny file-write* (subpath "%s%s"))', $home, $readOnly), $profile);
+        }
     }
 
     public function testStrictCutsTheNetwork(): void

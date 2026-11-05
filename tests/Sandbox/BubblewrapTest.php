@@ -175,6 +175,54 @@ final class BubblewrapTest extends TestCase
         self::assertFileExists($this->root.'/project/.git/index');
     }
 
+    public function testAWorktreesGitFileCannotBeRewritten(): void
+    {
+        $worktree = $this->worktreeOf($this->root.'/repository');
+        $pointer = $this->filesystem->readFile($worktree.'/.git');
+
+        $result = $this->runInSandbox('printf "gitdir: elsewhere\n" > .git', project: $worktree);
+
+        self::assertFalse($result->isSuccessful());
+        self::assertSame($pointer, $this->filesystem->readFile($worktree.'/.git'));
+    }
+
+    public function testAGitHookCannotBePlantedThroughAWorktree(): void
+    {
+        $worktree = $this->worktreeOf($this->root.'/repository');
+
+        $this->runInSandbox('git init -q planted && echo "rm -rf ~" > planted/.git/hooks/pre-commit && printf "gitdir: planted/.git\n" > .git', project: $worktree);
+
+        self::assertFileDoesNotExist($this->gitPath($worktree, 'hooks/pre-commit'));
+    }
+
+    public function testTheGitConfigurationCannotBeChangedThroughAWorktree(): void
+    {
+        $worktree = $this->worktreeOf($this->root.'/repository');
+
+        $this->runInSandbox('git init -q planted && git -C planted config core.hooksPath /tmp/hooks && printf "gitdir: planted/.git\n" > .git', project: $worktree);
+
+        self::assertSame('', $this->gitConfig($worktree, 'core.hooksPath'));
+    }
+
+    public function testAWorktreesRepositoryKeepsItsHooksWhereACommandMayWrite(): void
+    {
+        $worktree = $this->worktreeOf($this->root.'/home/.cache/repository');
+        $hook = $this->gitPath($worktree, 'hooks/pre-commit');
+
+        $this->runInSandbox(\sprintf('echo "rm -rf ~" > %s', escapeshellarg($hook)), project: $worktree);
+
+        self::assertFileDoesNotExist($hook);
+    }
+
+    public function testAWorktreesRepositoryKeepsItsConfigurationWhereACommandMayWrite(): void
+    {
+        $worktree = $this->worktreeOf($this->root.'/home/.cache/repository');
+
+        $this->runInSandbox('git config core.hooksPath /tmp/hooks', project: $worktree);
+
+        self::assertSame('', $this->gitConfig($worktree, 'core.hooksPath'));
+    }
+
     public function testTheUsersKeysCannotBeRead(): void
     {
         $result = $this->runInSandbox(\sprintf('cat %s/home/.ssh/id_ed25519; echo end', $this->root));
@@ -328,6 +376,35 @@ final class BubblewrapTest extends TestCase
         self::assertFileExists($socket, 'ssh-agent did not start: '.$this->sshAgent->getErrorOutput());
 
         return $socket;
+    }
+
+    /**
+     * A linked worktree of a new repository made at $repository, as `git worktree add` makes it: its `.git` is a file
+     * pointing into the repository's own git directory.
+     */
+    private function worktreeOf(string $repository): string
+    {
+        $worktree = $this->root.'/worktree';
+        $this->filesystem->mkdir($repository);
+        new Process(['git', 'init', '-q'], $repository)->mustRun();
+        new Process(['git', '-c', 'user.name=Airlock', '-c', 'user.email=airlock@example.invalid', 'commit', '-q', '--allow-empty', '-m', 'Start'], $repository)->mustRun();
+        new Process(['git', 'worktree', 'add', '-q', $worktree], $repository)->mustRun();
+
+        return $worktree;
+    }
+
+    /** Where git, run later outside the sandbox, finds $path of the worktree's repository. */
+    private function gitPath(string $worktree, string $path): string
+    {
+        return trim(new Process(['git', 'rev-parse', '--path-format=absolute', '--git-path', $path], $worktree)->mustRun()->getOutput());
+    }
+
+    private function gitConfig(string $worktree, string $key): string
+    {
+        $process = new Process(['git', 'config', '--get', $key], $worktree);
+        $process->run();
+
+        return trim($process->getOutput());
     }
 
     private function runInSandbox(string $commandLine, SandboxMode $mode = SandboxMode::Auto, int $timeoutSeconds = 30, ?string $project = null, ?string $sshAgentSocket = null): CommandResult

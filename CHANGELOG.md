@@ -18,6 +18,10 @@ minor version may change the configuration and file formats.
   `GITHUB_TOKEN`, or their Enterprise forms): an approved command could use it or copy it. Commands no longer get
   these variables; only Airlock's own GitHub reads use them, and never the Enterprise ones, which gh sends to any host
   the repository names.
+- In a linked git worktree, whose `.git` is a file, a command could point that file at a git directory of its own,
+  inside the project, with its own hooks and configuration: git then ran them outside the sandbox, and Airlock's own
+  GitHub reads took the repository from them. The `.git` file is now read-only to a command, like the `hooks` and
+  `config` of the git directory it points to and of the common one, wherever they are.
 
 ## 0.3.5 (2026-11-05)
 
