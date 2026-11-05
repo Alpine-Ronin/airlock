@@ -35,7 +35,7 @@ final readonly class SandboxPaths
     /** Under a git directory, what git runs or obeys outside the sandbox, later, as the user: directories, then files. */
     private const array GIT_CONTROL_DIRECTORIES = ['hooks'];
 
-    private const array GIT_CONTROL_FILES = ['config'];
+    private const array GIT_CONTROL_FILES = ['config', 'config.worktree'];
 
     /**
      * Under a git directory, where git takes its hooks and configuration from instead when it exists. A missing one is
@@ -172,14 +172,13 @@ final readonly class SandboxPaths
     public function readOnlyInProject(string $projectDirectory): array
     {
         $dotGit = $projectDirectory.'/.git';
-        if (is_dir($dotGit)) {
-            return $this->gitControl($dotGit);
-        }
-        if (!is_file($dotGit)) {
+        if (!is_dir($dotGit) && !is_file($dotGit)) {
             return [];
         }
-        $readOnly = [$dotGit];
-        foreach ($this->gitDirectoriesPointedToBy($dotGit) as $gitDirectory) {
+        $isGitFile = is_file($dotGit);
+        $readOnly = $isGitFile ? [$dotGit] : [];
+        $gitDirectories = $isGitFile ? $this->gitDirectoriesPointedToBy($dotGit) : $this->withCommonDirectory($dotGit);
+        foreach ($gitDirectories as $gitDirectory) {
             array_push($readOnly, ...$this->gitControl($gitDirectory));
         }
 
@@ -204,8 +203,8 @@ final readonly class SandboxPaths
     }
 
     /**
-     * The existing git directory a `.git` file points to, then the common directory it names in `commondir`, as git
-     * resolves them: each relative to the file that names it.
+     * The existing git directory a `.git` file points to, then its common directory, as git resolves them: each
+     * relative to the file that names it.
      *
      * @return list<string>
      */
@@ -219,6 +218,18 @@ final readonly class SandboxPaths
         if (null === $gitDirectory || !$this->isGitDirectory($gitDirectory)) {
             return [];
         }
+
+        return $this->withCommonDirectory($gitDirectory);
+    }
+
+    /**
+     * The git directory, then the existing common directory its `commondir` names, if any: git takes its hooks and
+     * configuration from there.
+     *
+     * @return non-empty-list<string>
+     */
+    private function withCommonDirectory(string $gitDirectory): array
+    {
         $commonDirectoryFile = $gitDirectory.'/'.self::GIT_COMMON_DIRECTORY_FILE;
         if (!is_file($commonDirectoryFile)) {
             return [$gitDirectory];

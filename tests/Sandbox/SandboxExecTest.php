@@ -70,7 +70,7 @@ final class SandboxExecTest extends TestCase
 
         $profile = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), cutsNetwork: false)->confine(['true'], $home.'/worktree')[2];
 
-        foreach (['/worktree/.git', '/repository/.git/hooks', '/repository/.git/config', '/repository/.git/commondir', '/repository/.git/worktrees/worktree/hooks', '/repository/.git/worktrees/worktree/config', '/repository/.git/worktrees/worktree/commondir'] as $readOnly) {
+        foreach (['/worktree/.git', '/repository/.git/hooks', '/repository/.git/config', '/repository/.git/commondir', '/repository/.git/config.worktree', '/repository/.git/worktrees/worktree/hooks', '/repository/.git/worktrees/worktree/config', '/repository/.git/worktrees/worktree/commondir'] as $readOnly) {
             self::assertStringContainsString(\sprintf('(deny file-write* (subpath "%s%s"))', $home, $readOnly), $profile);
         }
     }

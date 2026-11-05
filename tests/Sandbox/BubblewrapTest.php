@@ -168,6 +168,25 @@ final class BubblewrapTest extends TestCase
         self::assertSame(".\n", $this->filesystem->readFile($this->root.'/project/.git/commondir'), 'Git would take its hooks and configuration from the planted repository.');
     }
 
+    public function testAWorktreeConfigurationCannotBePlanted(): void
+    {
+        $this->runInSandbox('printf "[core]\n\thooksPath = /tmp/hooks\n" > .git/config.worktree');
+
+        self::assertSame('', $this->filesystem->readFile($this->root.'/project/.git/config.worktree'), 'Git reads it once extensions.worktreeConfig is set.');
+    }
+
+    public function testTheCommonDirectoryARepositoryNamesKeepsItsHooksWhereACommandMayWrite(): void
+    {
+        $common = $this->root.'/home/.cache/common';
+        $this->filesystem->mkdir($common);
+        new Process(['git', 'init', '-q', '--bare'], $common)->mustRun();
+        $this->filesystem->dumpFile($this->root.'/project/.git/commondir', $common."\n");
+
+        $this->runInSandbox(\sprintf('echo "rm -rf ~" > %s/hooks/pre-commit', escapeshellarg($common)));
+
+        self::assertFileDoesNotExist($common.'/hooks/pre-commit');
+    }
+
     public function testTheGitConfigurationCannotBeChanged(): void
     {
         $this->runInSandbox('echo "[core] hooksPath = /tmp/hooks" >> .git/config');
