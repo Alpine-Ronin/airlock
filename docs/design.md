@@ -151,6 +151,7 @@ Next, in this order:
   comments are read without asking, but come back as an output does: checked
   for injection, marked as data, secrets masked. Only GitHub, only these
   actions: any other service keeps the rule that its commands are the user's.
-- Releases that prove where they come from: build provenance, an SBOM, a
-  signed and notarized macOS binary.
+- A signed and notarized macOS binary, so that Gatekeeper opens it without a
+  warning. Releases already prove where they come from: each binary is attested
+  with its build provenance and an SBOM.
 - 1.0: the policy, grants and audit formats documented and kept stable.
