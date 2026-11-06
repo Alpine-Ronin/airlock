@@ -100,9 +100,15 @@ final readonly class AuditLog
 
     /**
      * @return list<string> the log, then the logs moved aside, those that exist
+     *
+     * @throws UnreadableAuditLogException when Airlock's directory cannot be entered: its logs would look missing
      */
     private function filesNewestFirst(): array
     {
+        $directory = $this->configDirectory->path;
+        if (is_dir($directory) && !is_executable($directory)) {
+            throw new UnreadableAuditLogException(\sprintf('Airlock cannot read %s.', $this->file()));
+        }
         $files = [$this->file()];
         for ($number = 1; $number <= $this->keptFiles; ++$number) {
             $files[] = $this->movedAside($number);
@@ -120,10 +126,7 @@ final readonly class AuditLog
      */
     private function linesNewestFirst(string $file): \Generator
     {
-        $handle = $this->open($file);
-        if (false === $handle) {
-            throw new UnreadableAuditLogException(\sprintf('Airlock cannot read %s.', $file));
-        }
+        $handle = $this->openToRead($file);
 
         try {
             fseek($handle, 0, \SEEK_END);
@@ -157,6 +160,28 @@ final readonly class AuditLog
     }
 
     /**
+     * fopen() says why a file cannot be opened only in a warning, silenced here: the exception says it instead.
+     *
+     * @return resource
+     *
+     * @throws UnreadableAuditLogException
+     */
+    private function openToRead(string $file)
+    {
+        set_error_handler(static fn (): bool => true);
+        try {
+            $handle = fopen($file, 'r');
+        } finally {
+            restore_error_handler();
+        }
+        if (false === $handle) {
+            throw new UnreadableAuditLogException(\sprintf('Airlock cannot read %s.', $file));
+        }
+
+        return $handle;
+    }
+
+    /**
      * @return \Generator<int, string>
      */
     private function unlessEmpty(string $line): \Generator
@@ -171,21 +196,6 @@ final readonly class AuditLog
      * which its directory ensures. A log an earlier version left open is replaced rather than closed: chmod does not
      * take back a file someone else opened in the meantime.
      */
-    /**
-     * fopen() says why a file cannot be opened only in a warning: the exception thrown on false says it instead.
-     *
-     * @return resource|false
-     */
-    private function open(string $file): mixed
-    {
-        set_error_handler(static fn (): bool => true);
-        try {
-            return fopen($file, 'r');
-        } finally {
-            restore_error_handler();
-        }
-    }
-
     private function closeToOthers(): void
     {
         $this->filesystem->mkdir($this->configDirectory->path, 0o700);
