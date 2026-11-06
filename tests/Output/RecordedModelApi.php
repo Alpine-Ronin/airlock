@@ -4,15 +4,17 @@ declare(strict_types=1);
 
 namespace App\Tests\Output;
 
+use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Contracts\HttpClient\ResponseInterface;
 
 /**
  * The model API as the server sees it in the test environment: every request to the configured API gets a recorded
- * answer, chosen by the structured output it asks for and the model, and nothing reaches the network.
+ * answer, chosen by the structured output it asks for and the model, and nothing reaches the network. A test can make a
+ * model take its time: the clock moves on before each of its answers.
  */
-final readonly class RecordedModelApi
+final class RecordedModelApi
 {
     /** A listed model the API answers 404 for. */
     public const string MISSING = 'test/missing';
@@ -32,10 +34,22 @@ final readonly class RecordedModelApi
     /** A model that checks outputs well but does not write the plain-words line in time. */
     public const string SLOW_LINE = 'test/slow-line';
 
+    /** @var array<string, positive-int> */
+    private array $secondsPerAnswer = [];
+
     public function __construct(
         #[Autowire(env: 'model_setting:AIRLOCK_AI_BASE_URL')]
-        private string $baseUrl,
+        private readonly string $baseUrl,
+        private readonly ClockInterface $clock,
     ) {
+    }
+
+    /**
+     * @param positive-int $seconds
+     */
+    public function answerAfter(string $model, int $seconds): void
+    {
+        $this->secondsPerAnswer[$model] = $seconds;
     }
 
     /**
@@ -51,6 +65,9 @@ final readonly class RecordedModelApi
         }
         $request = json_decode(\is_string($options['body'] ?? null) ? $options['body'] : '', true);
         $model = RecordedResponses::at($request, 'model');
+        if (\is_string($model) && isset($this->secondsPerAnswer[$model])) {
+            $this->clock->sleep($this->secondsPerAnswer[$model]);
+        }
         if (self::MISSING === $model) {
             return new MockResponse('{"status":404,"title":"Not Found"}', ['http_code' => 404]);
         }

@@ -9,6 +9,7 @@ use App\Output\NotCheckedReason;
 use App\Output\OutputChunker;
 use App\Output\OutputVerdict;
 use App\Risk\ModelRiskExplainer;
+use Psr\Clock\ClockInterface;
 use Psr\Log\NullLogger;
 use Symfony\AI\Platform\Bridge\Generic\Factory;
 use Symfony\AI\Platform\Exception\ExceptionInterface as PlatformException;
@@ -35,11 +36,13 @@ final readonly class ModelCalibrator
         private HttpClientInterface $httpClient,
         private EventDispatcherInterface $eventDispatcher,
         private ModelRetries $retries,
+        private ClockInterface $clock,
     ) {
     }
 
     public function calibrate(string $baseUrl, #[\SensitiveParameter] string $apiKey, string $model): Calibration
     {
+        $startedAt = $this->clock->now();
         $platform = Factory::createPlatform(rtrim($baseUrl, '/'), $apiKey, $this->httpClient, eventDispatcher: $this->eventDispatcher, supportsEmbeddings: false, name: 'calibration');
         $modelApi = new ModelApi($baseUrl, $apiKey);
         $classifier = new ModelInjectionClassifier($platform, new OutputChunker(), new NullLogger(), $modelApi, $this->retries, $model);
@@ -48,21 +51,21 @@ final readonly class ModelCalibrator
         if ($injected->reason instanceof NotCheckedReason) {
             $unusable = $injected->reason->describe();
 
-            return new Calibration($model, $unusable, $unusable, $injected->reason);
+            return new Calibration($model, $this->secondsSince($startedAt), $unusable, $unusable, $injected->reason);
         }
         if (!$injected->isInjection()) {
-            return $this->withRiskLine($platform, $modelApi, $model, 'it missed a known prompt injection');
+            return $this->withRiskLine($platform, $modelApi, $model, $startedAt, 'it missed a known prompt injection');
         }
 
         $harmless = $classifier->check(self::HARMLESS);
         if ($harmless->reason instanceof NotCheckedReason) {
-            return new Calibration($model, $harmless->reason->describe(), null, $harmless->reason);
+            return new Calibration($model, $this->secondsSince($startedAt), $harmless->reason->describe(), null, $harmless->reason);
         }
 
-        return $this->withRiskLine($platform, $modelApi, $model, OutputVerdict::Clean === $harmless->verdict ? null : 'it flagged a harmless output');
+        return $this->withRiskLine($platform, $modelApi, $model, $startedAt, OutputVerdict::Clean === $harmless->verdict ? null : 'it flagged a harmless output');
     }
 
-    private function withRiskLine(PlatformInterface $platform, ModelApi $modelApi, string $model, ?string $outputCheckFailure): Calibration
+    private function withRiskLine(PlatformInterface $platform, ModelApi $modelApi, string $model, \DateTimeImmutable $startedAt, ?string $outputCheckFailure): Calibration
     {
         $explainer = new ModelRiskExplainer($platform, new NullLogger(), $modelApi, $this->retries, $model);
         try {
@@ -70,9 +73,14 @@ final readonly class ModelCalibrator
         } catch (PlatformException|HttpClientException $e) {
             $reason = NotCheckedReason::forFailure($e);
 
-            return new Calibration($model, $outputCheckFailure, $reason->describe(), NotCheckedReason::RateLimited === $reason ? $reason : null);
+            return new Calibration($model, $this->secondsSince($startedAt), $outputCheckFailure, $reason->describe(), NotCheckedReason::RateLimited === $reason ? $reason : null);
         }
 
-        return new Calibration($model, $outputCheckFailure, null === $line ? 'it gave no short line for a dangerous command' : null);
+        return new Calibration($model, $this->secondsSince($startedAt), $outputCheckFailure, null === $line ? 'it gave no short line for a dangerous command' : null);
+    }
+
+    private function secondsSince(\DateTimeImmutable $startedAt): float
+    {
+        return (float) $this->clock->now()->format('U.u') - (float) $startedAt->format('U.u');
     }
 }
