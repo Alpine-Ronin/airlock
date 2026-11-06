@@ -9,4 +9,5 @@ enum ConfigFormat
     case Json;
     case Yaml;
     case Toml;
+    case FrontMatter;
 }

@@ -81,7 +81,9 @@ curl -fsSL https://raw.githubusercontent.com/hbenabdallah/airlock/main/install.s
 
 Or by hand: download `airlock-<platform>` and `SHA256SUMS` from the release, check that this prints the line
 `SHA256SUMS` has for it, then make it executable. On Linux, install bubblewrap as [below](#natively-with-php-85); macOS
-has `sandbox-exec` built in.
+has `sandbox-exec` built in. The macOS binary is not signed by Apple yet: downloaded with a browser, Gatekeeper refuses
+its first run. Clear the download mark with `xattr -d com.apple.quarantine airlock-macos-aarch64`, or allow it in
+*System Settings › Privacy & Security › Open Anyway*. The install script downloads with curl, which sets no such mark.
 
 ```bash
 shasum -a 256 airlock-<platform> && chmod +x airlock-<platform>
@@ -185,7 +187,7 @@ without Airlock.
 | Claude Code | `claude-code` | `.mcp.json`, `.claude/settings.local.json`; with `--scope user`, `~/.claude.json`, `~/.claude/settings.json` | Denied: `Bash` and `Monitor` |
 | Codex | `codex` | `~/.codex/config.toml`, or in `$CODEX_HOME` | Off: `shell_tool = false` |
 | Cursor | `cursor` | `.cursor/mcp.json` | Turn its terminal tool off in Cursor's agent settings |
-| VS Code | `vscode` | `.vscode/mcp.json` | Turn its terminal tool off in the chat's tool picker |
+| VS Code | `vscode` | `.vscode/mcp.json`, `.github/agents/airlock.agent.md` | None in the `airlock` agent: pick it in the chat. VS Code's other agents keep theirs |
 | Goose | `goose` | `~/.config/goose/config.yaml` | The developer extension keeps `write`, `edit` and `tree` |
 
 - It shows every change and asks before writing. The first time it changes a file, it keeps the file as it was in
@@ -214,7 +216,8 @@ with only once or refuse, the audit resource read.
 | Codex | End to end, 0.166 | Codex asks first whether Airlock's tool may run, then Airlock's form opens. A command allowed *always* runs without asking after a restart; asked to run a command without Airlock, the agent has no shell to do it. |
 | Goose | End to end, 1.57 | The form shows the choices by their values (`once`, `session`, `always`, `refuse`). Asked to run a command without Airlock, the agent finds no shell, even after turning the developer extension off and on. |
 | Cursor | Not yet | `connect` follows its documented format. |
-| VS Code | Not yet | `connect` follows its documented format. |
+| Cursor CLI (`cursor-agent`) | Does not work, 2026.11.05 | It declines every form without showing it, so Airlock refuses every command no grant covers. `connect cursor` writes the file it reads; deny its own shell with `Shell(*)` in `.cursor/cli.json`. |
+| VS Code | End to end, 1.145 | Pick the `airlock` agent in the chat. VS Code asks first whether Airlock's tool may run, then Airlock's form opens. The agent cannot read `airlock://audit` itself: open it with *MCP: Browse Resources*. |
 
 Tell us how a client behaves, tested or not.
 

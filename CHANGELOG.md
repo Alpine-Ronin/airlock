@@ -17,6 +17,10 @@ minor version may change the configuration and file formats.
   itself, never pushes (a branch not yet pushed is refused, saying to push it first), and gives back what gh printed as
   a command's output; in the audit log as `opened_on_github` or `refused_by_user`.
 
+- `airlock connect vscode` also writes an `airlock` agent, `.github/agents/airlock.agent.md`, whose tools leave out
+  VS Code's terminal: picked in the chat, the agent runs commands only through Airlock. `--remove` takes it back.
+  VS Code runs end to end (1.145).
+
 ### Security
 
 - A command got the GitHub CLI's token when the client started Airlock with one in its environment (`GH_TOKEN`,
