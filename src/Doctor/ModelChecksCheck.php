@@ -11,6 +11,7 @@ use App\Configuration\InvalidModelSettingsException;
 use App\Configuration\ModelSettingsFile;
 use App\Execution\ProjectDirectory;
 use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
+use Symfony\Component\Lock\Exception\ExceptionInterface as LockException;
 
 /**
  * Whether the output check and the plain-words line are on, from the settings the server would read, and whether the
@@ -53,7 +54,7 @@ final readonly class ModelChecksCheck implements Check
         if ('' !== $settings->outputCheckModel) {
             try {
                 $outputChecks = $this->outputCheckTimeouts->recent($this->projectDirectory->path);
-            } catch (UnreadableAuditLogException $e) {
+            } catch (UnreadableAuditLogException|LockException $e) {
                 return Finding::warning(self::TOPIC, $text.' '.$e->getMessage().' Whether the output check keeps timing out is unknown.');
             }
             if ($outputChecks->keepTimingOut()) {

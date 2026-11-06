@@ -6,6 +6,7 @@ namespace App\Audit;
 
 use App\Output\NotCheckedReason;
 use App\Output\OutputVerdict;
+use Symfony\Component\Lock\Exception\ExceptionInterface as LockException;
 
 /**
  * Reads from the audit log whether the output check keeps timing out in a project, for `doctor` and `log` to say so.
@@ -21,6 +22,7 @@ final readonly class OutputCheckTimeouts
 
     /**
      * @throws UnreadableAuditLogException when a log cannot be read
+     * @throws LockException               when the log's lock cannot be taken
      */
     public function recent(string $project): RecentOutputChecks
     {
