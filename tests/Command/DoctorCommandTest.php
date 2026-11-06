@@ -91,6 +91,23 @@ final class DoctorCommandTest extends KernelTestCase
         self::assertStringContainsString('Plain-words line: test/risk. Run airlock configure --check to calibrate them. The output check timed out on 3 of the last 3 outputs in this project', $this->display($tester));
     }
 
+    public function testAnAuditLogThatCannotBeReadDoesNotStopTheOtherChecks(): void
+    {
+        $this->filesystem->dumpFile(self::AIRLOCK.'/audit.jsonl', '');
+        $this->filesystem->chmod(self::AIRLOCK.'/audit.jsonl', 0o000);
+        $tester = $this->tester();
+
+        try {
+            $this->assertPermissionsAreEnforced(self::AIRLOCK.'/audit.jsonl');
+            $tester->execute([]);
+        } finally {
+            $this->filesystem->chmod(self::AIRLOCK.'/audit.jsonl', 0o600);
+        }
+
+        self::assertMatchesRegularExpression('/Model checks: .* Airlock cannot read .*audit\.jsonl\. Whether the output check keeps timing out is unknown\./', $this->display($tester));
+        self::assertStringContainsString('Clients:', $this->display($tester), 'The other checks still run.');
+    }
+
     public function testWithoutAModelApiTheChecksAreSaidToBeOff(): void
     {
         $_SERVER['AIRLOCK_AI_BASE_URL'] = $_ENV['AIRLOCK_AI_BASE_URL'] = '';

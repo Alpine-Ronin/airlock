@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Doctor;
 
 use App\Audit\OutputCheckTimeouts;
+use App\Audit\UnreadableAuditLogException;
 use App\Configuration\EffectiveModelSettings;
 use App\Configuration\InvalidModelSettingsException;
 use App\Configuration\ModelSettingsFile;
@@ -52,7 +53,11 @@ final readonly class ModelChecksCheck implements Check
         if ('' === $settings->outputCheckModel || '' === $settings->riskModel) {
             return Finding::warning(self::TOPIC, $text);
         }
-        $outputChecks = $this->outputCheckTimeouts->recent($this->projectDirectory->path);
+        try {
+            $outputChecks = $this->outputCheckTimeouts->recent($this->projectDirectory->path);
+        } catch (UnreadableAuditLogException $e) {
+            return Finding::warning(self::TOPIC, $text.' '.$e->getMessage().' Whether the output check keeps timing out is unknown.');
+        }
         if ($outputChecks->keepTimingOut()) {
             return Finding::warning(self::TOPIC, $text.' '.$outputChecks->warning());
         }

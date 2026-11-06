@@ -55,6 +55,8 @@ final readonly class AuditLog
      * The last entries for one project, oldest first, as the JSON lines they were written as.
      *
      * @return list<string>
+     *
+     * @throws UnreadableAuditLogException when a log cannot be read
      */
     public function lastEntriesFor(string $project, int $count): array
     {
@@ -118,9 +120,9 @@ final readonly class AuditLog
      */
     private function linesNewestFirst(string $file): \Generator
     {
-        $handle = fopen($file, 'r');
+        $handle = $this->open($file);
         if (false === $handle) {
-            throw new \RuntimeException(\sprintf('Airlock cannot read %s.', $file));
+            throw new UnreadableAuditLogException(\sprintf('Airlock cannot read %s.', $file));
         }
 
         try {
@@ -133,7 +135,7 @@ final readonly class AuditLog
                 fseek($handle, $position);
                 $chunk = fread($handle, $length);
                 if (false === $chunk) {
-                    throw new \RuntimeException(\sprintf('Airlock cannot read %s.', $file));
+                    throw new UnreadableAuditLogException(\sprintf('Airlock cannot read %s.', $file));
                 }
 
                 $parts = explode("\n", $chunk);
@@ -169,6 +171,21 @@ final readonly class AuditLog
      * which its directory ensures. A log an earlier version left open is replaced rather than closed: chmod does not
      * take back a file someone else opened in the meantime.
      */
+    /**
+     * fopen() says why a file cannot be opened only in a warning: the exception thrown on false says it instead.
+     *
+     * @return resource|false
+     */
+    private function open(string $file): mixed
+    {
+        set_error_handler(static fn (): bool => true);
+        try {
+            return fopen($file, 'r');
+        } finally {
+            restore_error_handler();
+        }
+    }
+
     private function closeToOthers(): void
     {
         $this->filesystem->mkdir($this->configDirectory->path, 0o700);

@@ -19,6 +19,9 @@ final readonly class OutputCheckTimeouts
     ) {
     }
 
+    /**
+     * @throws UnreadableAuditLogException when a log cannot be read
+     */
     public function recent(string $project): RecentOutputChecks
     {
         $outputs = 0;
