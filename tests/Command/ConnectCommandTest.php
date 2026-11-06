@@ -310,6 +310,29 @@ final class ConnectCommandTest extends KernelTestCase
         self::assertDirectoryDoesNotExist(self::HOME.'/.config/goose');
     }
 
+    public function testVsCodeGetsTheServerAndAnAgentWithoutATerminal(): void
+    {
+        $tester = $this->tester();
+
+        $status = $tester->execute(['client' => 'vscode']);
+
+        self::assertSame(Command::SUCCESS, $status, $tester->getDisplay());
+        self::assertSame('stdio', RecordedResponses::at($this->json(self::PROJECT.'/.vscode/mcp.json'), 'servers', 'airlock', 'type'));
+        $agent = (string) file_get_contents(self::PROJECT.'/.github/agents/airlock.agent.md');
+        self::assertSame(1, preg_match('/\A---\n(.*?)^---\n\z/sm', $agent, $frontMatter), $agent);
+        self::assertSame(['airlock/*', 'read', 'edit', 'search'], RecordedResponses::at(Yaml::parse($frontMatter[1]), 'tools'), 'The agent has no terminal: VS Code names it execute.');
+    }
+
+    public function testRemovingFromVsCodeDeletesTheAgentAndItsDirectories(): void
+    {
+        $this->tester()->execute(['client' => 'vscode']);
+
+        $this->tester()->execute(['client' => 'vscode', '--remove' => true]);
+
+        self::assertDirectoryDoesNotExist(self::PROJECT.'/.github');
+        self::assertDirectoryDoesNotExist(self::PROJECT.'/.vscode');
+    }
+
     public function testAFileAirlockCannotEditSafelyIsLeftAsItWas(): void
     {
         $original = "{\n  // my servers\n  \"servers\": {}\n}\n";
@@ -320,6 +343,7 @@ final class ConnectCommandTest extends KernelTestCase
 
         self::assertSame(Command::FAILURE, $status);
         self::assertStringEqualsFile(self::PROJECT.'/.vscode/mcp.json', $original);
+        self::assertFileDoesNotExist(self::PROJECT.'/.github/agents/airlock.agent.md', 'One file Airlock cannot edit stops them all.');
         self::assertStringContainsString('Make the change by hand', $tester->getDisplay());
     }
 
