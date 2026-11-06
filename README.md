@@ -252,7 +252,8 @@ client afterwards.
 - `--max-probes` (default 15) bounds how many models that answer are calibrated; a listed model that gives no answer
   (many APIs list withdrawn ones) does not count.
 - `--fastest` keeps calibrating up to `--max-probes` and keeps the fastest model that passes, instead of the first:
-  each calibrated model shows how long it took. A slow model makes every command wait for its check.
+  the fastest that passes both checks, even when a faster one passes only one, else the fastest for each. Each
+  calibrated model shows how long it took. A slow model makes every command wait for its check.
 
 For instance, NVIDIA's API catalog has a free tier (get a key at [build.nvidia.com](https://build.nvidia.com)): its URL
 is `https://integrate.api.nvidia.com`, and `airlock configure` found `minimaxai/minimax-m3.1-flash` fit for both
