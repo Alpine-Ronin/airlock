@@ -185,7 +185,7 @@ without Airlock.
 | Claude Code | `claude-code` | `.mcp.json`, `.claude/settings.local.json`; with `--scope user`, `~/.claude.json`, `~/.claude/settings.json` | Denied: `Bash` and `Monitor` |
 | Codex | `codex` | `~/.codex/config.toml`, or in `$CODEX_HOME` | Off: `shell_tool = false` |
 | Cursor | `cursor` | `.cursor/mcp.json` | Turn its terminal tool off in Cursor's agent settings |
-| VS Code | `vscode` | `.vscode/mcp.json` | Turn its terminal tool off in the chat's tool picker |
+| VS Code | `vscode` | `.vscode/mcp.json`, `.github/agents/airlock.agent.md` | None in the `airlock` agent: pick it in the chat. VS Code's other agents keep theirs |
 | Goose | `goose` | `~/.config/goose/config.yaml` | The developer extension keeps `write`, `edit` and `tree` |
 
 - It shows every change and asks before writing. The first time it changes a file, it keeps the file as it was in
@@ -214,7 +214,7 @@ with only once or refuse, the audit resource read.
 | Codex | End to end, 0.166 | Codex asks first whether Airlock's tool may run, then Airlock's form opens. A command allowed *always* runs without asking after a restart; asked to run a command without Airlock, the agent has no shell to do it. |
 | Goose | End to end, 1.57 | The form shows the choices by their values (`once`, `session`, `always`, `refuse`). Asked to run a command without Airlock, the agent finds no shell, even after turning the developer extension off and on. |
 | Cursor | Not yet | `connect` follows its documented format. |
-| VS Code | Not yet | `connect` follows its documented format. |
+| VS Code | End to end, 1.145 | Pick the `airlock` agent in the chat. VS Code asks first whether Airlock's tool may run, then Airlock's form opens. The agent cannot read `airlock://audit` itself: open it with *MCP: Browse Resources*. |
 
 Tell us how a client behaves, tested or not.
 

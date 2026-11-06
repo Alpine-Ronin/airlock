@@ -61,8 +61,8 @@ Airlock sees only the commands that come through `run_command`: an agent that
 keeps its client's own shell tool can run anything without it, and no MCP
 message can take that tool away. `airlock connect` does it from the client's
 files where the client allows it (Claude Code's deny rules, Codex's
-`shell_tool` feature, Goose's tool filter), and says what to do by hand where
-no file can (Cursor, VS Code). It edits those files in place and keeps what
+`shell_tool` feature, Goose's tool filter, a VS Code agent whose tools leave
+the terminal out), and says what to do by hand where no file can (Cursor). It edits those files in place and keeps what
 else they hold: a JSON file with comments, or a TOML table written as dotted
 keys, is left to the user rather than rewritten. It keeps each file as it was
 before it first changed it, in its own directory, and `--remove` reads that
@@ -136,7 +136,7 @@ written under a `symfony/lock` lock: two agents can share one Airlock.
 
 Done: the parser, the policy, both sandboxes, the form and its grants, the
 audit log, rotated past a size, the model checks, `airlock connect` for five
-clients, three of them run end to end, grants and recent decisions from the
+clients, four of them run end to end, grants and recent decisions from the
 terminal (`airlock grants`, `airlock log`), `airlock doctor`, and a static
 binary per platform, and reading a pull request's checks and comments for the
 agent (`github_pr_checks`, `github_pr_comments`): Airlock runs the user's `gh`
@@ -151,7 +151,7 @@ are the user's.
 
 Next, in this order:
 
-- Cursor and VS Code run end to end, as the others were.
+- Cursor runs end to end, as the others were.
 - A signed and notarized macOS binary, so that Gatekeeper opens it without a
   warning. Releases already prove where they come from: each binary is attested
   with its build provenance and an SBOM.
