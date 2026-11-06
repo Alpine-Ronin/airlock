@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace App\Doctor;
 
+use App\Audit\OutputCheckTimeouts;
 use App\Configuration\EffectiveModelSettings;
 use App\Configuration\InvalidModelSettingsException;
 use App\Configuration\ModelSettingsFile;
+use App\Execution\ProjectDirectory;
 use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
- * Whether the output check and the plain-words line are on, from the settings the server would read. Calibrating the
- * models takes the network: `airlock configure --check` does it.
+ * Whether the output check and the plain-words line are on, from the settings the server would read, and whether the
+ * output check keeps timing out in the project, from the audit log. Calibrating the models takes the network:
+ * `airlock configure --check` does it.
  */
 #[AsTaggedItem(priority: 50)]
 final readonly class ModelChecksCheck implements Check
@@ -21,6 +24,8 @@ final readonly class ModelChecksCheck implements Check
     public function __construct(
         private ModelSettingsFile $file,
         private EffectiveModelSettings $effectiveSettings,
+        private OutputCheckTimeouts $outputCheckTimeouts,
+        private ProjectDirectory $projectDirectory,
     ) {
     }
 
@@ -46,6 +51,10 @@ final readonly class ModelChecksCheck implements Check
         );
         if ('' === $settings->outputCheckModel || '' === $settings->riskModel) {
             return Finding::warning(self::TOPIC, $text);
+        }
+        $outputChecks = $this->outputCheckTimeouts->recent($this->projectDirectory->path);
+        if ($outputChecks->keepTimingOut()) {
+            return Finding::warning(self::TOPIC, $text.' '.$outputChecks->warning());
         }
 
         return Finding::ok(self::TOPIC, $text);

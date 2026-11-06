@@ -11,6 +11,7 @@ use App\Configuration\ConfigDirectory;
 use App\Output\NotCheckedReason;
 use App\Output\OutputCheck;
 use App\Policy\Verdict;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Console\Command\Command;
@@ -125,6 +126,49 @@ final class LogCommandTest extends KernelTestCase
         self::assertStringNotContainsString("\e[2J", $tester->getDisplay(), 'An agent writes the commands: it must not clear the screen or set the title of the terminal reading them.');
         self::assertStringNotContainsString("\x07", $tester->getDisplay());
         self::assertStringContainsString('<error>fake</error>', $tester->getDisplay(), 'A tag in a command is shown as it is, not styled.');
+    }
+
+    public function testAnOutputCheckThatKeepsTimingOutIsWarnedAbout(): void
+    {
+        $this->append('make test', Verdict::Plain, Outcome::RanOnce, OutputCheck::clean(), '10:00');
+        foreach (['10:01', '10:02', '10:03'] as $time) {
+            $this->append('make test', Verdict::Plain, Outcome::RanOnce, OutputCheck::notChecked(NotCheckedReason::Timeout), $time);
+        }
+        $tester = $this->tester();
+
+        $tester->execute(['--last' => '1']);
+
+        $display = (string) preg_replace('/\s+/', ' ', $tester->getDisplay());
+        self::assertStringContainsString('The output check timed out on 3 of the last 4 outputs in this project', $display, 'The warning reads the recent decisions, whatever --last shows.');
+        self::assertStringContainsString('airlock configure --fastest', $display);
+    }
+
+    /**
+     * @return iterable<string, array{list<OutputCheck>}>
+     */
+    public static function outputChecksThatDoNotKeepTimingOut(): iterable
+    {
+        $timeout = OutputCheck::notChecked(NotCheckedReason::Timeout);
+        $rateLimited = OutputCheck::notChecked(NotCheckedReason::RateLimited);
+
+        yield 'two timeouts' => [[$timeout, OutputCheck::clean(), $timeout]];
+        yield 'checks left out for another reason' => [[$rateLimited, $rateLimited, $rateLimited]];
+    }
+
+    /**
+     * @param list<OutputCheck> $outputChecks
+     */
+    #[DataProvider('outputChecksThatDoNotKeepTimingOut')]
+    public function testAnOutputCheckThatDoesNotKeepTimingOutIsNotWarnedAbout(array $outputChecks): void
+    {
+        foreach ($outputChecks as $minute => $outputCheck) {
+            $this->append('make test', Verdict::Plain, Outcome::RanOnce, $outputCheck, \sprintf('10:%02d', $minute));
+        }
+        $tester = $this->tester();
+
+        $tester->execute([]);
+
+        self::assertStringNotContainsString('timed out on', $tester->getDisplay());
     }
 
     public function testACountThatIsNotAPositiveNumberIsRefused(): void

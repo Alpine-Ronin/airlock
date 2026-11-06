@@ -362,7 +362,9 @@ output in a bug report.
   says so and asks about every command.
 - **"Nothing runs until this is fixed: …"**: a policy or grants file is invalid; the message names it.
 - **"It was not checked for prompt injection: …"**: no key, or the model was slow, rate limited or down. The command
-  ran; only the check is missing. `airlock configure --check` tells whether the model still passes.
+  ran; only the check is missing. `airlock configure --check` tells whether the model still passes. When the check
+  timed out on 3 or more of the project's last 20 decisions, `airlock doctor` and `airlock log` warn about it:
+  `airlock configure --fastest` picks a faster model.
 - **The client does not list Airlock**: run the server command in a terminal, from the project. It should wait
   silently for input (`Ctrl+D` ends it); an error there is what the client meets. Claude Code's `claude mcp list` runs
   the same check.

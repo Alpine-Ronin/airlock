@@ -4,11 +4,20 @@ declare(strict_types=1);
 
 namespace App\Tests\Command;
 
+use App\Audit\AuditEntry;
+use App\Audit\AuditLog;
+use App\Audit\Outcome;
+use App\Configuration\ConfigDirectory;
+use App\Output\NotCheckedReason;
+use App\Output\OutputCheck;
+use App\Policy\Verdict;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\Lock\Store\InMemoryStore;
 
 final class DoctorCommandTest extends KernelTestCase
 {
@@ -68,6 +77,18 @@ final class DoctorCommandTest extends KernelTestCase
 
         self::assertStringContainsString('Through https://models.example.test. Output check: test/output-check. Plain-words line: test/risk.', $this->display($tester));
         self::assertStringNotContainsString('test-key', $this->display($tester), 'The API key is never shown.');
+    }
+
+    public function testAnOutputCheckThatKeepsTimingOutIsAWarning(): void
+    {
+        $log = new AuditLog(new ConfigDirectory(self::HOME, self::HOME.'/.config'), new LockFactory(new InMemoryStore()));
+        foreach (['10:00', '10:01', '10:02'] as $time) {
+            $log->append(new AuditEntry(new \DateTimeImmutable('2026-11-05T'.$time.':00+00:00'), (string) realpath(self::PROJECT), 'make test', Verdict::Plain, Outcome::RanOnce, outputCheck: OutputCheck::notChecked(NotCheckedReason::Timeout)));
+        }
+        $tester = $this->tester();
+
+        self::assertSame(Command::SUCCESS, $tester->execute([]), 'A warning leaves Airlock working: only a problem fails.');
+        self::assertStringContainsString('Plain-words line: test/risk. Run airlock configure --check to calibrate them. The output check timed out on 3 of the last 3 outputs in this project', $this->display($tester));
     }
 
     public function testWithoutAModelApiTheChecksAreSaidToBeOff(): void
