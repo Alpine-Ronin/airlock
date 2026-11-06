@@ -23,7 +23,10 @@ final class AirlockApplication extends Application
     #[\Override]
     public function doRun(InputInterface $input, OutputInterface $output): int
     {
-        if (null === $this->getCommandName($input) && $input->hasParameterOption(['--help', '-h'], true)) {
+        $namesNoCommand = null === $this->getCommandName($input);
+        $asksForHelp = $input->hasParameterOption(['--help', '-h'], true);
+        $asksForTheVersion = $input->hasParameterOption(['--version', '-V'], true);
+        if ($namesNoCommand && $asksForHelp && !$asksForTheVersion) {
             return parent::doRun(new ArrayInput([]), $output);
         }
 

@@ -36,6 +36,16 @@ final class AirlockApplicationTest extends KernelTestCase
         self::assertSame($alone, $tester->getDisplay());
     }
 
+    public function testTheVersionAskedForWithHelpIsAllThatIsShown(): void
+    {
+        $tester = $this->tester();
+
+        $tester->run(['--version' => true, '--help' => true]);
+
+        self::assertMatchesRegularExpression('/^\S+ \S+ \(env: test, debug: \w+\)\n$/', $tester->getDisplay());
+        self::assertStringNotContainsString('Examples', $tester->getDisplay(), 'As in any Symfony application, --version wins over --help.');
+    }
+
     public function testAHiddenCommandStillRunsWhenNamed(): void
     {
         $tester = $this->tester();
@@ -54,6 +64,17 @@ final class AirlockApplicationTest extends KernelTestCase
             $class = ($command instanceof LazyCommand ? $command->getCommand() : $command)::class;
             if (str_starts_with($class, 'App\\')) {
                 self::assertFalse($command->isHidden(), \sprintf('%s is Airlock\'s: add it to AirlockApplication::LISTED_COMMANDS and to the examples.', $name));
+            }
+        }
+    }
+
+    public function testEveryOtherCommandIsHidden(): void
+    {
+        $application = new AirlockApplication(self::bootKernel());
+
+        foreach ($application->all() as $name => $command) {
+            if (!\in_array($command->getName(), AirlockApplication::LISTED_COMMANDS, true)) {
+                self::assertTrue($command->isHidden(), \sprintf('%s is not one of Airlock\'s commands.', $name));
             }
         }
     }
