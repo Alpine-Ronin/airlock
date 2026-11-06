@@ -216,6 +216,7 @@ with only once or refuse, the audit resource read.
 | Codex | End to end, 0.166 | Codex asks first whether Airlock's tool may run, then Airlock's form opens. A command allowed *always* runs without asking after a restart; asked to run a command without Airlock, the agent has no shell to do it. |
 | Goose | End to end, 1.57 | The form shows the choices by their values (`once`, `session`, `always`, `refuse`). Asked to run a command without Airlock, the agent finds no shell, even after turning the developer extension off and on. |
 | Cursor | Not yet | `connect` follows its documented format. |
+| Cursor CLI (`cursor-agent`) | Does not work, 2026.11.05 | It declines every form without showing it, so Airlock refuses every command no grant covers. `connect cursor` writes the file it reads; deny its own shell with `Shell(*)` in `.cursor/cli.json`. |
 | VS Code | End to end, 1.145 | Pick the `airlock` agent in the chat. VS Code asks first whether Airlock's tool may run, then Airlock's form opens. The agent cannot read `airlock://audit` itself: open it with *MCP: Browse Resources*. |
 
 Tell us how a client behaves, tested or not.
