@@ -4,18 +4,27 @@ declare(strict_types=1);
 
 namespace App\Tests\Command;
 
+use App\Command\ConfigureCommand;
 use App\Configuration\ConfigDirectory;
+use App\Configuration\EffectiveModelSettings;
+use App\Configuration\ModelCalibrator;
+use App\Configuration\ModelList;
+use App\Configuration\ModelRetries;
 use App\Configuration\ModelSetting;
 use App\Configuration\ModelSettings;
 use App\Configuration\ModelSettingsFile;
 use App\Tests\Output\RecordedModelApi;
 use App\Tests\Output\RecordedResponses;
+use Symfony\AI\Platform\StructuredOutput\PlatformSubscriber;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Clock\Test\ClockSensitiveTrait;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\HttpClient\MockHttpClient;
 
 final class ConfigureCommandTest extends KernelTestCase
 {
@@ -83,6 +92,29 @@ final class ConfigureCommandTest extends KernelTestCase
 
         self::assertStringContainsString(RecordedModelApi::MISSING.'  the model could not be reached or gave no usable answer', $tester->getDisplay());
         self::assertSame(RecordedModelApi::BLIND, $this->file->read()->riskModel, 'The listed model after the unanswered one is calibrated within a budget of one.');
+    }
+
+    public function testFastestKeepsTheFastestModelThatPassesAmongEveryModelCalibrated(): void
+    {
+        $tester = $this->testerWhereAModelTakesItsTime('test/output-check', 5);
+
+        $tester->setInputs([RecordedResponses::BASE_URL, 'secret-key']);
+        $status = $tester->execute(['--fastest' => true]);
+
+        self::assertSame(Command::SUCCESS, $status, $tester->getDisplay());
+        self::assertEquals(new ModelSettings(RecordedResponses::BASE_URL, 'secret-key', 'test/risk', 'test/risk'), $this->file->read(), 'test/output-check passes first, but takes longer than test/risk.');
+        self::assertStringContainsString('test/output-check  output check: passes · plain-words line: passes · 15.0 s', $tester->getDisplay());
+    }
+
+    public function testWithoutFastestTheFirstModelThatPassesIsKeptHoweverSlow(): void
+    {
+        $tester = $this->testerWhereAModelTakesItsTime('test/output-check', 5);
+
+        $tester->setInputs([RecordedResponses::BASE_URL, 'secret-key']);
+        $tester->execute([]);
+
+        self::assertSame('test/output-check', $this->file->read()->outputCheckModel);
+        self::assertStringNotContainsString('test/risk', $tester->getDisplay(), 'Calibration stops at the first model that passes.');
     }
 
     public function testWhenNoListedModelPassesTheUserIsAskedForOne(): void
@@ -174,6 +206,24 @@ final class ConfigureCommandTest extends KernelTestCase
         foreach (ModelSetting::cases() as $setting) {
             $_SERVER[$setting->environmentVariable()] = $_ENV[$setting->environmentVariable()] = '';
         }
+    }
+
+    /**
+     * The command built by hand, on a mocked clock the recorded API moves on: the container's API answers at once.
+     *
+     * @param positive-int $seconds
+     */
+    private function testerWhereAModelTakesItsTime(string $model, int $seconds): CommandTester
+    {
+        $clock = new MockClock('2026-11-01 10:00:00');
+        $modelApi = new RecordedModelApi(RecordedResponses::BASE_URL, $clock);
+        $modelApi->answerAfter($model, $seconds);
+        $httpClient = new MockHttpClient($modelApi);
+        $dispatcher = new EventDispatcher();
+        $dispatcher->addSubscriber(new PlatformSubscriber());
+        $calibrator = new ModelCalibrator($httpClient, $dispatcher, new ModelRetries(1), $clock);
+
+        return new CommandTester(new ConfigureCommand($this->file, new ModelList($httpClient), $calibrator, $clock, new EffectiveModelSettings('', '', '', '')));
     }
 
     private function tester(): CommandTester

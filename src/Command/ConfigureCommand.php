@@ -9,6 +9,7 @@ use App\Configuration\EffectiveModelSettings;
 use App\Configuration\InvalidModelSettingsException;
 use App\Configuration\ModelCalibrator;
 use App\Configuration\ModelList;
+use App\Configuration\ModelPreference;
 use App\Configuration\ModelSettings;
 use App\Configuration\ModelSettingsFile;
 use Symfony\Component\Clock\ClockInterface;
@@ -24,8 +25,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
  * Sets up the model checks in a terminal, never through the agent: the API and its key, then the models, found by
- * calibrating what the API lists (one model fit for both checks first, else the first fit for each), or asked for
- * when none passes. Writes them to `models.yaml`.
+ * calibrating what the API lists (one model fit for both checks first, else the first fit for each; with --fastest, the
+ * fastest of those among every model calibrated), or asked for when none passes. Writes them to `models.yaml`.
  */
 #[AsCommand(name: 'configure', description: 'Set up the model checks: the API, its key and the models, calibrated before they are kept')]
 final class ConfigureCommand extends Command
@@ -51,6 +52,7 @@ final class ConfigureCommand extends Command
             ->addOption('base-url', null, InputOption::VALUE_REQUIRED, 'The API, without /v1/chat/completions')
             ->addOption('output-check-model', null, InputOption::VALUE_REQUIRED, 'The model that checks outputs, instead of finding one')
             ->addOption('risk-model', null, InputOption::VALUE_REQUIRED, 'The model that writes the plain-words line, instead of finding one')
+            ->addOption('fastest', null, InputOption::VALUE_NONE, 'Calibrate up to --max-probes models and keep the fastest that passes, instead of the first')
             ->addOption('max-probes', null, InputOption::VALUE_REQUIRED, 'How many models that answer to calibrate at most; one that gives no answer does not count', '15');
     }
 
@@ -84,8 +86,10 @@ final class ConfigureCommand extends Command
             $listed = $this->listed($io, $baseUrl, $apiKey);
             $maxProbes = max(1, (int) $this->option($input, 'max-probes'));
             $io->section(\sprintf('Calibrating up to %d models that answer', $maxProbes));
-            $outputCheckFallback = '';
-            $riskFallback = '';
+            $preference = true === $input->getOption('fastest') ? ModelPreference::Fastest : ModelPreference::First;
+            $bothFit = null;
+            $outputCheckFit = null;
+            $riskFit = null;
             $answered = 0;
             foreach ($listed as $model) {
                 if ($answered >= $maxProbes) {
@@ -102,16 +106,26 @@ final class ConfigureCommand extends Command
                     continue;
                 }
                 ++$answered;
-                if ($calibration->passesOutputCheck() && $calibration->passesRiskLine()) {
-                    $outputCheckModel = '' === $outputCheckModel ? $model : $outputCheckModel;
-                    $riskModel = '' === $riskModel ? $model : $riskModel;
+                if ($calibration->passesOutputCheck() && $preference->prefers($calibration, $outputCheckFit)) {
+                    $outputCheckFit = $calibration;
+                }
+                if ($calibration->passesRiskLine() && $preference->prefers($calibration, $riskFit)) {
+                    $riskFit = $calibration;
+                }
+                $passesBoth = $calibration->passesOutputCheck() && $calibration->passesRiskLine();
+                if ($passesBoth && $preference->prefers($calibration, $bothFit)) {
+                    $bothFit = $calibration;
+                }
+                if ($bothFit instanceof Calibration && ModelPreference::First === $preference) {
                     break;
                 }
-                $outputCheckFallback = '' === $outputCheckFallback && $calibration->passesOutputCheck() ? $model : $outputCheckFallback;
-                $riskFallback = '' === $riskFallback && $calibration->passesRiskLine() ? $model : $riskFallback;
             }
-            $outputCheckModel = '' === $outputCheckModel ? $outputCheckFallback : $outputCheckModel;
-            $riskModel = '' === $riskModel ? $riskFallback : $riskModel;
+            if ('' === $outputCheckModel) {
+                $outputCheckModel = ($bothFit ?? $outputCheckFit)->model ?? '';
+            }
+            if ('' === $riskModel) {
+                $riskModel = ($bothFit ?? $riskFit)->model ?? '';
+            }
         }
 
         $outputCheckModel = $this->confirmed($io, 'output check', $outputCheckModel, $baseUrl, $apiKey, $calibrations, static fn (Calibration $c): bool => $c->passesOutputCheck());
@@ -262,10 +276,11 @@ final class ConfigureCommand extends Command
             return;
         }
         $io->text(\sprintf(
-            '%s  output check: %s · plain-words line: %s',
+            '%s  output check: %s · plain-words line: %s · %.1f s',
             $calibration->model,
             $calibration->outputCheckFailure ?? 'passes',
             $calibration->riskLineFailure ?? 'passes',
+            $calibration->seconds,
         ));
     }
 
