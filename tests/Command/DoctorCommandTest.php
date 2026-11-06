@@ -115,6 +115,22 @@ final class DoctorCommandTest extends KernelTestCase
         self::assertStringContainsString('Whether the output check keeps timing out is unknown.', $this->display($tester), 'A log Airlock cannot reach is not a log without timeouts.');
     }
 
+    public function testADirectoryAboveTheAuditLogThatCannotBeEnteredLeavesTheTimeoutsUnknown(): void
+    {
+        $this->appendTimedOutOutputs(3);
+        $this->filesystem->chmod(self::HOME.'/.config', 0o000);
+        $tester = $this->tester();
+
+        try {
+            $this->assertPermissionsAreEnforced(self::AIRLOCK);
+            $tester->execute([]);
+        } finally {
+            $this->filesystem->chmod(self::HOME.'/.config', 0o700);
+        }
+
+        self::assertMatchesRegularExpression('/Airlock cannot read .*audit\.jsonl: .*\/\.config cannot be entered\. Whether the output check keeps timing out is unknown\./', $this->display($tester));
+    }
+
     public function testAnAuditLogThatCannotBeReadDoesNotStopTheOtherChecks(): void
     {
         $this->filesystem->dumpFile(self::AIRLOCK.'/audit.jsonl', '');
@@ -128,7 +144,7 @@ final class DoctorCommandTest extends KernelTestCase
             $this->filesystem->chmod(self::AIRLOCK.'/audit.jsonl', 0o600);
         }
 
-        self::assertMatchesRegularExpression('/Model checks: .* Airlock cannot read .*audit\.jsonl\. Whether the output check keeps timing out is unknown\./', $this->display($tester));
+        self::assertMatchesRegularExpression('/Model checks: .* Airlock cannot read .*audit\.jsonl: Failed to open stream: Permission denied\. Whether the output check keeps timing out is unknown\./', $this->display($tester));
         self::assertStringContainsString('Clients:', $this->display($tester), 'The other checks still run.');
     }
 
