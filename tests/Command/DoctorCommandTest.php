@@ -236,6 +236,59 @@ final class DoctorCommandTest extends KernelTestCase
         self::assertStringContainsString('Clients:', $this->display($tester), 'The other checks still run.');
     }
 
+    public function testADirectoryThatCanBeListedButNotEnteredIsAProblem(): void
+    {
+        $this->filesystem->dumpFile(self::AIRLOCK.'/projects/demo/grants.yaml', "always: []\n");
+        $this->filesystem->chmod(self::AIRLOCK, 0o700);
+        $this->filesystem->chmod(self::AIRLOCK.'/projects', 0o600);
+        $tester = $this->tester();
+
+        try {
+            $this->assertPermissionsAreEnforced(self::AIRLOCK.'/projects/demo');
+            $status = $tester->execute([]);
+        } finally {
+            $this->filesystem->chmod(self::AIRLOCK.'/projects', 0o700);
+        }
+
+        self::assertSame(Command::FAILURE, $status, 'What cannot be looked at is not known to be private.');
+        self::assertStringContainsString(\sprintf("Airlock's files: Airlock cannot read all of %s", self::AIRLOCK), $this->display($tester));
+    }
+
+    public function testAirlocksDirectoryThatCanBeListedButNotEnteredIsAProblem(): void
+    {
+        $this->filesystem->dumpFile(self::AIRLOCK.'/models.yaml', '');
+        $this->filesystem->chmod(self::AIRLOCK, 0o600);
+        $tester = $this->tester();
+
+        try {
+            $this->assertPermissionsAreEnforced(self::AIRLOCK.'/models.yaml');
+            $status = $tester->execute([]);
+        } finally {
+            $this->filesystem->chmod(self::AIRLOCK, 0o700);
+        }
+
+        self::assertSame(Command::FAILURE, $status);
+        self::assertStringContainsString(\sprintf("Airlock's files: Airlock cannot read all of %s", self::AIRLOCK), $this->display($tester));
+    }
+
+    public function testADirectoryAboveAirlocksThatCannotBeEnteredIsAProblem(): void
+    {
+        $this->filesystem->mkdir(self::AIRLOCK, 0o700);
+        $this->filesystem->chmod(self::HOME.'/.config', 0o000);
+        $tester = $this->tester();
+
+        try {
+            $this->assertPermissionsAreEnforced(self::AIRLOCK);
+            $status = $tester->execute([]);
+        } finally {
+            $this->filesystem->chmod(self::HOME.'/.config', 0o700);
+        }
+
+        self::assertSame(Command::FAILURE, $status);
+        self::assertStringContainsString(\sprintf("Airlock's files: Airlock cannot reach %s: %s cannot be entered.", self::AIRLOCK, self::HOME.'/.config'), $this->display($tester));
+        self::assertStringNotContainsString('does not exist yet', $this->display($tester));
+    }
+
     public function testAClientFileThatCannotBeReadLeavesThatClientOut(): void
     {
         $this->filesystem->dumpFile(self::PROJECT.'/.mcp.json', '{}');
