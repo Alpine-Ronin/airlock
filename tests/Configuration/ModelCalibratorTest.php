@@ -10,17 +10,38 @@ use App\Tests\Output\RecordedModelApi;
 use App\Tests\Output\RecordedResponses;
 use PHPUnit\Framework\TestCase;
 use Symfony\AI\Platform\StructuredOutput\PlatformSubscriber;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\HttpClient\MockHttpClient;
 
 final class ModelCalibratorTest extends TestCase
 {
+    private MockClock $clock;
+
+    private RecordedModelApi $modelApi;
+
+    #[\Override]
+    protected function setUp(): void
+    {
+        $this->clock = new MockClock('2026-11-01 10:00:00');
+        $this->modelApi = new RecordedModelApi(RecordedResponses::BASE_URL, $this->clock);
+    }
+
     public function testAModelThatFlagsTheInjectionAndPassesTheRestIsFitForBothChecks(): void
     {
         $calibration = $this->calibrator()->calibrate(RecordedResponses::BASE_URL, 'test-key', 'test/output-check');
 
         self::assertTrue($calibration->passesOutputCheck());
         self::assertTrue($calibration->passesRiskLine());
+    }
+
+    public function testACalibrationSaysHowLongItTook(): void
+    {
+        $this->modelApi->answerAfter('test/output-check', 2);
+
+        $calibration = $this->calibrator()->calibrate(RecordedResponses::BASE_URL, 'test-key', 'test/output-check');
+
+        self::assertSame(6.0, $calibration->seconds, 'Three answers of two seconds: the injection, the harmless output and the plain-words line.');
     }
 
     public function testAModelThatMissesTheInjectionIsUnfitForTheOutputCheck(): void
@@ -78,6 +99,6 @@ final class ModelCalibratorTest extends TestCase
         $dispatcher = new EventDispatcher();
         $dispatcher->addSubscriber(new PlatformSubscriber());
 
-        return new ModelCalibrator(new MockHttpClient(new RecordedModelApi(RecordedResponses::BASE_URL)), $dispatcher, new ModelRetries(1));
+        return new ModelCalibrator(new MockHttpClient($this->modelApi), $dispatcher, new ModelRetries(1), $this->clock);
     }
 }

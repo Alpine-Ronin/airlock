@@ -6,6 +6,7 @@ namespace App\Audit;
 
 use App\Configuration\ConfigDirectory;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Lock\Exception\ExceptionInterface as LockException;
 use Symfony\Component\Lock\LockFactory;
 
 /**
@@ -55,6 +56,9 @@ final readonly class AuditLog
      * The last entries for one project, oldest first, as the JSON lines they were written as.
      *
      * @return list<string>
+     *
+     * @throws UnreadableAuditLogException when a log cannot be read
+     * @throws LockException               when the log's lock cannot be taken
      */
     public function lastEntriesFor(string $project, int $count): array
     {
@@ -98,15 +102,36 @@ final readonly class AuditLog
 
     /**
      * @return list<string> the log, then the logs moved aside, those that exist
+     *
+     * @throws UnreadableAuditLogException when Airlock's directory, or one above it, cannot be entered: its logs would
+     *                                     look missing
      */
     private function filesNewestFirst(): array
     {
+        $reachable = $this->nearestExistingDirectory($this->configDirectory->path);
+        if (!is_executable($reachable)) {
+            throw new UnreadableAuditLogException(\sprintf('Airlock cannot read %s: %s cannot be entered.', $this->file(), $reachable));
+        }
         $files = [$this->file()];
         for ($number = 1; $number <= $this->keptFiles; ++$number) {
             $files[] = $this->movedAside($number);
         }
 
         return array_values(array_filter($files, is_file(...)));
+    }
+
+    /**
+     * The directory itself, or the closest one above it that is seen to exist: below a directory that cannot be
+     * entered, nothing is seen to exist.
+     */
+    private function nearestExistingDirectory(string $directory): string
+    {
+        $path = $directory;
+        while (!is_dir($path) && \dirname($path) !== $path) {
+            $path = \dirname($path);
+        }
+
+        return $path;
     }
 
     /**
@@ -118,10 +143,7 @@ final readonly class AuditLog
      */
     private function linesNewestFirst(string $file): \Generator
     {
-        $handle = fopen($file, 'r');
-        if (false === $handle) {
-            throw new \RuntimeException(\sprintf('Airlock cannot read %s.', $file));
-        }
+        $handle = $this->openToRead($file);
 
         try {
             fseek($handle, 0, \SEEK_END);
@@ -133,7 +155,7 @@ final readonly class AuditLog
                 fseek($handle, $position);
                 $chunk = fread($handle, $length);
                 if (false === $chunk) {
-                    throw new \RuntimeException(\sprintf('Airlock cannot read %s.', $file));
+                    throw new UnreadableAuditLogException(\sprintf('Airlock cannot read %s.', $file));
                 }
 
                 $parts = explode("\n", $chunk);
@@ -152,6 +174,33 @@ final readonly class AuditLog
         } finally {
             fclose($handle);
         }
+    }
+
+    /**
+     * fopen() says why a file cannot be opened only in a warning, caught here: the exception says it instead.
+     *
+     * @return resource
+     *
+     * @throws UnreadableAuditLogException
+     */
+    private function openToRead(string $file)
+    {
+        $reason = 'it cannot be opened';
+        set_error_handler(static function (int $level, string $message) use (&$reason): bool {
+            $reason = (string) preg_replace('/^fopen\(.*?\): /', '', $message);
+
+            return true;
+        });
+        try {
+            $handle = fopen($file, 'r');
+        } finally {
+            restore_error_handler();
+        }
+        if (false === $handle) {
+            throw new UnreadableAuditLogException(\sprintf('Airlock cannot read %s: %s.', $file, $reason));
+        }
+
+        return $handle;
     }
 
     /**

@@ -9,12 +9,14 @@ use App\Output\NotCheckedReason;
 /**
  * What one model did on the calibration samples: null where it passed, why it failed otherwise. A rate-limited
  * calibration says nothing about the model: the API stopped answering. An unanswered one is a model the API lists but
- * does not serve, or one that cannot give the answer the checks need, or not in time.
+ * does not serve, or one that cannot give the answer the checks need, or not in time. The seconds are how long the
+ * calibration took, to compare models that pass.
  */
 final readonly class Calibration
 {
     public function __construct(
         public string $model,
+        public float $seconds,
         public ?string $outputCheckFailure,
         public ?string $riskLineFailure,
         public ?NotCheckedReason $notCheckedReason = null,

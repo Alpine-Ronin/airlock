@@ -4,11 +4,20 @@ declare(strict_types=1);
 
 namespace App\Tests\Command;
 
+use App\Audit\AuditEntry;
+use App\Audit\AuditLog;
+use App\Audit\Outcome;
+use App\Configuration\ConfigDirectory;
+use App\Output\NotCheckedReason;
+use App\Output\OutputCheck;
+use App\Policy\Verdict;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\Lock\Store\InMemoryStore;
 
 final class DoctorCommandTest extends KernelTestCase
 {
@@ -68,6 +77,75 @@ final class DoctorCommandTest extends KernelTestCase
 
         self::assertStringContainsString('Through https://models.example.test. Output check: test/output-check. Plain-words line: test/risk.', $this->display($tester));
         self::assertStringNotContainsString('test-key', $this->display($tester), 'The API key is never shown.');
+    }
+
+    public function testAnOutputCheckThatKeepsTimingOutIsAWarning(): void
+    {
+        $this->appendTimedOutOutputs(3);
+        $tester = $this->tester();
+
+        self::assertSame(Command::SUCCESS, $tester->execute([]), 'A warning leaves Airlock working: only a problem fails.');
+        self::assertStringContainsString('Plain-words line: test/risk. Run airlock configure --check to calibrate them. The output check timed out on 3 of the last 3 outputs in this project', $this->display($tester));
+    }
+
+    public function testAnOutputCheckThatKeepsTimingOutIsAWarningEvenWithThePlainWordsLineOff(): void
+    {
+        $this->appendTimedOutOutputs(3);
+        $_SERVER['AIRLOCK_RISK_MODEL'] = $_ENV['AIRLOCK_RISK_MODEL'] = '';
+        $tester = $this->tester();
+
+        $tester->execute([]);
+
+        self::assertStringContainsString('The output check timed out on 3 of the last 3 outputs in this project', $this->display($tester));
+    }
+
+    public function testAnAuditDirectoryThatCannotBeEnteredLeavesTheTimeoutsUnknown(): void
+    {
+        $this->appendTimedOutOutputs(3);
+        $this->filesystem->chmod(self::AIRLOCK, 0o000);
+        $tester = $this->tester();
+
+        try {
+            $this->assertPermissionsAreEnforced(self::AIRLOCK.'/audit.jsonl');
+            $tester->execute([]);
+        } finally {
+            $this->filesystem->chmod(self::AIRLOCK, 0o700);
+        }
+
+        self::assertStringContainsString('Whether the output check keeps timing out is unknown.', $this->display($tester), 'A log Airlock cannot reach is not a log without timeouts.');
+    }
+
+    public function testADirectoryAboveTheAuditLogThatCannotBeEnteredLeavesTheTimeoutsUnknown(): void
+    {
+        $this->appendTimedOutOutputs(3);
+        $this->filesystem->chmod(self::HOME.'/.config', 0o000);
+        $tester = $this->tester();
+
+        try {
+            $this->assertPermissionsAreEnforced(self::AIRLOCK);
+            $tester->execute([]);
+        } finally {
+            $this->filesystem->chmod(self::HOME.'/.config', 0o700);
+        }
+
+        self::assertMatchesRegularExpression('/Airlock cannot read .*audit\.jsonl: .*\/\.config cannot be entered\. Whether the output check keeps timing out is unknown\./', $this->display($tester));
+    }
+
+    public function testAnAuditLogThatCannotBeReadDoesNotStopTheOtherChecks(): void
+    {
+        $this->filesystem->dumpFile(self::AIRLOCK.'/audit.jsonl', '');
+        $this->filesystem->chmod(self::AIRLOCK.'/audit.jsonl', 0o000);
+        $tester = $this->tester();
+
+        try {
+            $this->assertPermissionsAreEnforced(self::AIRLOCK.'/audit.jsonl');
+            $tester->execute([]);
+        } finally {
+            $this->filesystem->chmod(self::AIRLOCK.'/audit.jsonl', 0o600);
+        }
+
+        self::assertMatchesRegularExpression('/Model checks: .* Airlock cannot read .*audit\.jsonl: Failed to open stream: Permission denied\. Whether the output check keeps timing out is unknown\./', $this->display($tester));
+        self::assertStringContainsString('Clients:', $this->display($tester), 'The other checks still run.');
     }
 
     public function testWithoutAModelApiTheChecksAreSaidToBeOff(): void
@@ -222,6 +300,14 @@ final class DoctorCommandTest extends KernelTestCase
 
         self::assertDirectoryDoesNotExist(self::AIRLOCK, 'The doctor looks, and changes nothing.');
         self::assertSame([], array_values(array_diff((array) scandir(self::PROJECT), ['.', '..'])));
+    }
+
+    private function appendTimedOutOutputs(int $count): void
+    {
+        $log = new AuditLog(new ConfigDirectory(self::HOME, self::HOME.'/.config'), new LockFactory(new InMemoryStore()));
+        for ($minute = 0; $minute < $count; ++$minute) {
+            $log->append(new AuditEntry(new \DateTimeImmutable(\sprintf('2026-11-05T10:%02d:00+00:00', $minute)), (string) realpath(self::PROJECT), 'make test', Verdict::Plain, Outcome::RanOnce, outputCheck: OutputCheck::notChecked(NotCheckedReason::Timeout)));
+        }
     }
 
     private function assertPermissionsAreEnforced(string $unreadable): void

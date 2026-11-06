@@ -251,6 +251,9 @@ client afterwards.
   nothing: run it when a model starts failing.
 - `--max-probes` (default 15) bounds how many models that answer are calibrated; a listed model that gives no answer
   (many APIs list withdrawn ones) does not count.
+- `--fastest` keeps calibrating up to `--max-probes` and keeps the fastest model that passes, instead of the first:
+  the fastest that passes both checks, even when a faster one passes only one, else the fastest for each. Each
+  calibrated model shows how long it took. A slow model makes every command wait for its check.
 
 For instance, NVIDIA's API catalog has a free tier (get a key at [build.nvidia.com](https://build.nvidia.com)): its URL
 is `https://integrate.api.nvidia.com`, and `airlock configure` found `minimaxai/minimax-m3.1-flash` fit for both
@@ -359,7 +362,9 @@ output in a bug report.
   says so and asks about every command.
 - **"Nothing runs until this is fixed: …"**: a policy or grants file is invalid; the message names it.
 - **"It was not checked for prompt injection: …"**: no key, or the model was slow, rate limited or down. The command
-  ran; only the check is missing. `airlock configure --check` tells whether the model still passes.
+  ran; only the check is missing. `airlock configure --check` tells whether the model still passes. When the check
+  timed out on 3 or more of the project's last 20 decisions, `airlock doctor` and `airlock log` warn about it:
+  `airlock configure --fastest` picks a faster model.
 - **The client does not list Airlock**: run the server command in a terminal, from the project. It should wait
   silently for input (`Ctrl+D` ends it); an error there is what the client meets. Claude Code's `claude mcp list` runs
   the same check.
