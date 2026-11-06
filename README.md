@@ -81,7 +81,9 @@ curl -fsSL https://raw.githubusercontent.com/hbenabdallah/airlock/main/install.s
 
 Or by hand: download `airlock-<platform>` and `SHA256SUMS` from the release, check that this prints the line
 `SHA256SUMS` has for it, then make it executable. On Linux, install bubblewrap as [below](#natively-with-php-85); macOS
-has `sandbox-exec` built in.
+has `sandbox-exec` built in. The macOS binary is not signed by Apple yet: downloaded with a browser, Gatekeeper refuses
+its first run. Clear the download mark with `xattr -d com.apple.quarantine airlock-macos-aarch64`, or allow it in
+*System Settings › Privacy & Security › Open Anyway*. The install script downloads with curl, which sets no such mark.
 
 ```bash
 shasum -a 256 airlock-<platform> && chmod +x airlock-<platform>
