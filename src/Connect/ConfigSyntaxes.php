@@ -10,6 +10,7 @@ final readonly class ConfigSyntaxes
         private JsonConfig $json,
         private YamlConfig $yaml,
         private TomlConfig $toml,
+        private FrontMatterConfig $frontMatter,
     ) {
     }
 
@@ -19,6 +20,7 @@ final readonly class ConfigSyntaxes
             ConfigFormat::Json => $this->json,
             ConfigFormat::Yaml => $this->yaml,
             ConfigFormat::Toml => $this->toml,
+            ConfigFormat::FrontMatter => $this->frontMatter,
         };
     }
 }

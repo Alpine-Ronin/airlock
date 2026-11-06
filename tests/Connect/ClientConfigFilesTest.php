@@ -14,6 +14,7 @@ use App\Connect\ConfigSyntaxes;
 use App\Connect\ConnectionOriginals;
 use App\Connect\Direction;
 use App\Connect\FileEdit;
+use App\Connect\FrontMatterConfig;
 use App\Connect\JsonConfig;
 use App\Connect\TomlConfig;
 use App\Connect\YamlConfig;
@@ -100,7 +101,7 @@ final class ClientConfigFilesTest extends TestCase
     private function files(): ClientConfigFiles
     {
         return new ClientConfigFiles(
-            new ConfigSyntaxes(new JsonConfig(), new YamlConfig(), new TomlConfig()),
+            new ConfigSyntaxes(new JsonConfig(), new YamlConfig(), new TomlConfig(), new FrontMatterConfig(new YamlConfig())),
             new ConnectionOriginals(new ConfigDirectory(self::ROOT.'/home')),
         );
     }
