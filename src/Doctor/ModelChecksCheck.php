@@ -50,16 +50,18 @@ final readonly class ModelChecksCheck implements Check
             '' === $settings->outputCheckModel ? 'off' : $settings->outputCheckModel,
             '' === $settings->riskModel ? 'off' : $settings->riskModel,
         );
+        if ('' !== $settings->outputCheckModel) {
+            try {
+                $outputChecks = $this->outputCheckTimeouts->recent($this->projectDirectory->path);
+            } catch (UnreadableAuditLogException $e) {
+                return Finding::warning(self::TOPIC, $text.' '.$e->getMessage().' Whether the output check keeps timing out is unknown.');
+            }
+            if ($outputChecks->keepTimingOut()) {
+                return Finding::warning(self::TOPIC, $text.' '.$outputChecks->warning());
+            }
+        }
         if ('' === $settings->outputCheckModel || '' === $settings->riskModel) {
             return Finding::warning(self::TOPIC, $text);
-        }
-        try {
-            $outputChecks = $this->outputCheckTimeouts->recent($this->projectDirectory->path);
-        } catch (UnreadableAuditLogException $e) {
-            return Finding::warning(self::TOPIC, $text.' '.$e->getMessage().' Whether the output check keeps timing out is unknown.');
-        }
-        if ($outputChecks->keepTimingOut()) {
-            return Finding::warning(self::TOPIC, $text.' '.$outputChecks->warning());
         }
 
         return Finding::ok(self::TOPIC, $text);
