@@ -158,6 +158,22 @@ jobs:
                   cd "$(mktemp -d)" && "$binary" connect codex --no-interaction
                   grep -Fx "command = \"$binary\"" "$HOME/.codex/config.toml"
 
+            # What a user runs in a terminal, on every target: the help, doctor on the sandbox there, and log after a command.
+            - name: Run Airlock's own commands
+              shell: bash
+              run: |
+                  export HOME="$(mktemp -d)"
+                  binary="$GITHUB_WORKSPACE/airlock-${{ matrix.target }}"
+                  cd "$(mktemp -d)"
+                  "$binary" > help.txt
+                  grep -F 'every agent command passes through it' help.txt
+                  if grep -F 'cache:clear' help.txt; then exit 1; fi
+                  "$binary" doctor | tee doctor.txt
+                  grep -E '✔ Sandbox: Sandbox \((bubblewrap|sandbox-exec)\)' doctor.txt
+                  python3 "$GITHUB_WORKSPACE/.github/scripts/smoke.py" -- "$binary" mcp:server
+                  "$binary" log | tee log.txt
+                  grep -F 'allowed once' log.txt
+
             - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
               with:
                   name: airlock-${{ matrix.target }}
