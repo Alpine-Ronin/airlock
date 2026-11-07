@@ -255,12 +255,13 @@ final readonly class CommandPolicy
 
         $secrets = [];
         foreach ($candidates as $candidate) {
-            // The value of an option or an assignment names a file too: --env-file=.env, FILE=id_rsa; and a leading
-            // @ sends a file's content, for curl -d @.env or -F key=@id_rsa.
-            $equals = strrpos($candidate, '=');
-            $path = ltrim(false === $equals ? $candidate : substr($candidate, $equals + 1), '@');
-            if ($this->secretFiles->isSecret($path)) {
-                $secrets[] = $path;
+            // Each part of an option's or an assignment's value may name a file: --env-file=.env, FILE=id_rsa, and
+            // curl's -F key=@id_rsa;filename=public.txt, where @ or < sends that file's content.
+            foreach (explode('=', str_replace(';', '=', $candidate)) as $part) {
+                $path = ltrim($part, '@<');
+                if ($this->secretFiles->isSecret($path)) {
+                    $secrets[] = $path;
+                }
             }
         }
 
