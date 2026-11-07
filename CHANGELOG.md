@@ -3,17 +3,16 @@
 What changed in each release, newest first. Versions follow [semantic versioning](https://semver.org): until 1.0, a
 minor version may change the configuration and file formats.
 
-## Unreleased
+## 0.5.0 (2026-11-07)
 
 ### Added
 
 - `airlock grants --preset php|node|python` allows a kind of project's usual commands always, once the user agrees to
   the list: tests, linters and static analysis, never an install, a delete, a push or a download; each bound to its
-  files like any grant. `airlock doctor` suggests the preset a project's files point to while nothing is allowed.
-
+  files like any grant. `airlock doctor` suggests the preset a project's files point to while nothing is allowed (#71).
 - `airlock configure --check --samples <file>` measures the output check on a file of outputs, injected or clean: how
   many injections it flags, how many clean outputs it flags too. `tests/Fixtures/injection/` holds the public corpora,
-  and the README the results.
+  and the README the results (#68).
 
 ### Changed
 
@@ -22,14 +21,14 @@ minor version may change the configuration and file formats.
 - A command sending a secret file's content, such as `curl -d @.env …` or `-F key=@id_rsa`, is asked about every time,
   as one naming the file already was. Airlock reads curl's options to find the files it sends (`-d`, `--data-urlencode`,
   `-F` with quoted names, lists and `headers=@`, `-T` with `{a,b}`, `-K`, `-H @`, `-b`), values attached to short
-  options included (`-K.env`), on top of the word check every command gets (#70).
-
+  options included (`-K.env`), and every file an upload pattern names, on top of the word check every command gets
+  (#68, #72).
 - A grant holds only while the project files deciding what its command does are unchanged: the Makefile for `make`,
   `package.json` for npm, pnpm, yarn and bun, `composer.json` for Composer, the script an interpreter or a path runs,
   also behind a wrapper or a `cd`. Once one changes, Airlock asks again and names it; `airlock grants` lists them. A
   line that can change such a file before the command reading it starts is asked about whatever the grants.
   `grants.yaml` gains a `sources` list per grant. A grant from an earlier version, of a command that reads such a
-  file, is asked about once more (#65).
+  file, is asked about once more (#65, #66).
 
 ## 0.4.0 (2026-11-07)
 
