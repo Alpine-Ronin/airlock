@@ -7,6 +7,10 @@ minor version may change the configuration and file formats.
 
 ### Added
 
+- `airlock grants --preset php|node|python` allows a kind of project's usual commands always, once the user agrees to
+  the list: tests, linters and static analysis, never an install, a delete, a push or a download; each bound to its
+  files like any grant. `airlock doctor` suggests the preset a project's files point to while nothing is allowed.
+
 - `airlock configure --check --samples <file>` measures the output check on a file of outputs, injected or clean: how
   many injections it flags, how many clean outputs it flags too. `tests/Fixtures/injection/` holds the public corpora,
   and the README the results.

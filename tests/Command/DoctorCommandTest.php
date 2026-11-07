@@ -148,6 +148,16 @@ final class DoctorCommandTest extends KernelTestCase
         self::assertStringContainsString('Clients:', $this->display($tester), 'The other checks still run.');
     }
 
+    public function testAProjectWithoutGrantsIsOfferedThePresetItsFilesSuggest(): void
+    {
+        $this->filesystem->dumpFile(self::PROJECT.'/package.json', "{}\n");
+        $tester = $this->tester();
+
+        $tester->execute([]);
+
+        self::assertStringContainsString('Grants: No command is allowed always in this project. To allow its usual commands (tests, linters, analysis) in one step: airlock grants --preset node.', $this->display($tester));
+    }
+
     public function testWithoutAModelApiTheChecksAreSaidToBeOff(): void
     {
         $_SERVER['AIRLOCK_AI_BASE_URL'] = $_ENV['AIRLOCK_AI_BASE_URL'] = '';

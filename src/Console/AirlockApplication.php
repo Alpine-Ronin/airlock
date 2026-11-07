@@ -47,6 +47,7 @@ final class AirlockApplication extends Application
               airlock doctor                Check that Airlock can protect this project
               airlock log                   Show the last decisions Airlock made in this project
               airlock grants                List the commands allowed always here; --revoke <number> takes one back
+              airlock grants --preset php   Allow a project's tests, linters and analysis always (also node, python)
               airlock help <command>        Show every option of a command
             HELP;
     }
