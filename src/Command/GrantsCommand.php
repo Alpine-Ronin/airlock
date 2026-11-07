@@ -8,6 +8,7 @@ use App\Execution\ProjectDirectory;
 use App\Grant\Grant;
 use App\Grant\InvalidGrantsException;
 use App\Grant\ProjectGrants;
+use App\Grant\Source;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -130,8 +131,9 @@ final class GrantsCommand extends Command
     {
         $rows = [];
         foreach ($grants as $number => $grant) {
-            $rows[] = [(string) $number, TerminalText::of($grant->describe())];
+            $sources = implode(', ', array_map(static fn (Source $source): string => $source->path, $grant->sources));
+            $rows[] = [(string) $number, TerminalText::of($grant->describe()), TerminalText::of($sources)];
         }
-        $io->table(['#', 'Command'], $rows);
+        $io->table(['#', 'Command', 'While unchanged'], $rows);
     }
 }

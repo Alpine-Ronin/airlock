@@ -9,6 +9,7 @@ use App\Execution\ProjectDirectory;
 use App\Grant\Grant;
 use App\Grant\InvalidGrantsException;
 use App\Grant\ProjectGrants;
+use App\Grant\Source;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
@@ -51,6 +52,15 @@ final class ProjectGrantsTest extends TestCase
         $this->grants()->add([new Grant(['make', 'test'], coversLongerCommands: true), new Grant(['ls', '-la'], coversLongerCommands: false)]);
 
         self::assertEquals([new Grant(['make', 'test'], true), new Grant(['ls', '-la'], false)], $this->grants()->all());
+    }
+
+    public function testTheSourcesOfAGrantAreReadBack(): void
+    {
+        $grant = new Grant(['make', 'test'], coversLongerCommands: true, sources: [new Source('Makefile', hash('sha256', 'test:'))]);
+
+        $this->grants()->add([$grant]);
+
+        self::assertEquals([$grant], $this->grants()->all());
     }
 
     public function testTheGrantsFileIsWritableAndReadableByItsOwnerOnly(): void

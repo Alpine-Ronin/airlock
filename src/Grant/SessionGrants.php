@@ -13,15 +13,13 @@ final class SessionGrants
     private array $grants = [];
 
     /**
+     * A grant given again replaces the one it equals: it holds the sources as they are now.
+     *
      * @param list<Grant> $grants
      */
     public function add(array $grants): void
     {
-        foreach ($grants as $grant) {
-            if (!array_any($this->grants, $grant->equals(...))) {
-                $this->grants[] = $grant;
-            }
-        }
+        $this->grants = GrantList::with($this->grants, $grants);
     }
 
     /**
