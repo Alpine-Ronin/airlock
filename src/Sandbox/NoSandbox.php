@@ -18,6 +18,12 @@ final readonly class NoSandbox implements Sandbox
     }
 
     #[\Override]
+    public function cutsNetwork(): bool
+    {
+        return false;
+    }
+
+    #[\Override]
     public function describe(): string
     {
         return \sprintf('No sandbox (%s): the command runs with all your permissions.', $this->reason);

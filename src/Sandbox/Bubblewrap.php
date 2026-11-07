@@ -77,6 +77,12 @@ final readonly class Bubblewrap implements Sandbox
     }
 
     #[\Override]
+    public function cutsNetwork(): bool
+    {
+        return $this->cutsNetwork;
+    }
+
+    #[\Override]
     public function describe(): string
     {
         return \sprintf(

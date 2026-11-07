@@ -36,6 +36,12 @@ final readonly class SandboxExec implements Sandbox
     }
 
     #[\Override]
+    public function cutsNetwork(): bool
+    {
+        return $this->cutsNetwork;
+    }
+
+    #[\Override]
     public function describe(): string
     {
         return \sprintf(

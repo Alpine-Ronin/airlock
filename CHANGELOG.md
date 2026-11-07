@@ -7,6 +7,9 @@ minor version may change the configuration and file formats.
 
 ### Changed
 
+- `airlock doctor` warns when commands can reach the network, as they do by default (`AIRLOCK_SANDBOX=auto`): one an
+  injection slipped in can send what the project holds elsewhere. `AIRLOCK_SANDBOX=strict` cuts the network off.
+
 - A grant holds only while the project files deciding what its command does are unchanged: the Makefile for `make`,
   `package.json` for npm, pnpm, yarn and bun, `composer.json` for Composer, the script an interpreter or a path runs,
   also behind a wrapper or a `cd`. Once one changes, Airlock asks again and names it; `airlock grants` lists them. A
