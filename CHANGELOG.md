@@ -3,48 +3,63 @@
 What changed in each release, newest first. Versions follow [semantic versioning](https://semver.org): until 1.0, a
 minor version may change the configuration and file formats.
 
-## Unreleased
+## 0.4.0 (2026-11-07)
 
 ### Added
 
 - `github_pr_checks` and `github_pr_comments`: the agent reads a pull request's CI checks, and its reviews and
   comments, line comments included. Airlock runs the user's GitHub CLI itself, outside the sandbox and without asking,
   and gives back what it read as a command's output: secrets masked, checked for prompt injection, marked as data,
-  in the audit log as `read_from_github`.
+  in the audit log as `read_from_github` (#57).
 - `github_open_pr`: the agent opens a pull request from the current branch, with a title, a body, and optionally a base
   and as a draft. The user is asked every time and can only allow it once or refuse; the form shows the repository,
   the branch and its base, the title, whether it is a draft, and the body. Airlock builds the `gh pr create` call
   itself, never pushes (a branch not yet pushed is refused, saying to push it first), and gives back what gh printed as
-  a command's output; in the audit log as `opened_on_github` or `refused_by_user`.
-
+  a command's output; in the audit log as `opened_on_github` or `refused_by_user` (#59).
 - `airlock connect vscode` also writes an `airlock` agent, `.github/agents/airlock.agent.md`, whose tools leave out
   VS Code's terminal: picked in the chat, the agent runs commands only through Airlock. `--remove` takes it back.
-  VS Code runs end to end (1.145).
+  VS Code runs end to end (1.145) (#60).
+- `airlock configure` shows how long each model took to calibrate, and `--fastest` keeps calibrating up to
+  `--max-probes` models that answer and keeps the fastest that passes, instead of the first: the fastest fit for both
+  checks, else the fastest for each (#61).
+- `airlock doctor` and `airlock log` warn when the output check timed out on 3 or more of the project's last 20
+  decisions, and suggest `airlock configure --fastest` (#61).
+
+### Changed
+
+- `airlock` and `airlock --help` say what Airlock is, give examples, and list only Airlock's commands: the framework's
+  (`cache:*`, `debug:*`, `assets:install`...) are hidden, and still run when named (#61).
+
+### Fixed
+
+- `airlock doctor` called Airlock's files private when their directory, or a folder in it, could be listed but not
+  entered, and said the directory did not exist yet when one above it could not be entered. Both are now a problem
+  to fix (#62).
 
 ### Security
 
 - A command got the GitHub CLI's token when the client started Airlock with one in its environment (`GH_TOKEN`,
   `GITHUB_TOKEN`, or their Enterprise forms): an approved command could use it or copy it. Commands no longer get
   these variables; only Airlock's own GitHub reads use them, and never the Enterprise ones, which gh sends to any host
-  the repository names.
+  the repository names (#57).
 - In a linked git worktree, whose `.git` is a file, a command could point that file at a git directory of its own,
   inside the project, with its own hooks and configuration: git then ran them outside the sandbox, and Airlock's own
   GitHub reads took the repository from them. The `.git` file is now read-only to a command, like the `hooks` and
-  `config` of the git directory it points to and of the common one, wherever they are.
+  `config` of the git directory it points to and of the common one, wherever they are (#59).
 - In any repository, a command could write `.git/commondir`, which tells git to take its hooks and configuration from
   another git directory, one of its own. `commondir` is now read-only to a command; where there is none, Airlock first
   makes one naming the git directory itself (`.`), which git reads as if there were none. The common directory an
   existing `commondir` names is kept like the git directory, and so is `config.worktree`, which git reads once
   `extensions.worktreeConfig` is set. A git directory a `.git` file or a `commondir` names stays kept even without its
-  `HEAD`: a command could otherwise remove it in one run and plant a hook there in the next.
+  `HEAD`: a command could otherwise remove it in one run and plant a hook there in the next (#59).
 - A command could move the project's `.git` directory aside, or a git directory a `.git` file points to, make a git
   directory of its own in its place and plant hooks that git then ran outside the sandbox. A command can now write in
   these directories but no longer move or remove them, nor the directories between them and the writable one holding
-  them.
+  them (#59).
 - Where git reaches its hooks or configuration through a symbolic link in a directory a command may write to, such as
   `.git/hooks` linked to a folder of the repository, a command could replace the link with one of its own: the sandbox
   keeps a link's target read-only, never the link. Airlock now runs no command there and names the link to replace; to
-  share hooks, set `core.hooksPath` instead.
+  share hooks, set `core.hooksPath` instead (#59).
 
 ## 0.3.5 (2026-11-05)
 
