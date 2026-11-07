@@ -56,7 +56,7 @@ final class ShellParser
                 continue;
             }
 
-            $commands[] = $this->command($words, $redirections, $readsPipe);
+            $commands[] = $this->command($words, $redirections, $readsPipe, TokenType::Separator === $token->type && '&' === $token->text);
             $words = [];
             $redirections = [];
             $readsPipe = TokenType::Pipe === $token->type;
@@ -65,7 +65,7 @@ final class ShellParser
         if (null !== $pendingOperator) {
             $opacity ??= Opacity::MissingRedirectionTarget;
         }
-        $commands[] = $this->command($words, $redirections, $readsPipe);
+        $commands[] = $this->command($words, $redirections, $readsPipe, runsInBackground: false);
 
         $commands = array_values(array_filter($commands, static fn (SimpleCommand $command): bool => [] !== $command->words || [] !== $command->redirections));
         $opacity ??= $this->opacityOfPrograms($tokens);
@@ -77,7 +77,7 @@ final class ShellParser
      * @param list<Token>       $words
      * @param list<Redirection> $redirections
      */
-    private function command(array $words, array $redirections, bool $readsPipe): SimpleCommand
+    private function command(array $words, array $redirections, bool $readsPipe, bool $runsInBackground): SimpleCommand
     {
         $texts = array_map(static fn (Token $word): string => $word->text, $words);
         $assignments = 0;
@@ -85,7 +85,7 @@ final class ShellParser
             ++$assignments;
         }
 
-        return new SimpleCommand($texts, $redirections, $readsPipe, $assignments);
+        return new SimpleCommand($texts, $redirections, $readsPipe, $assignments, $runsInBackground);
     }
 
     /**
