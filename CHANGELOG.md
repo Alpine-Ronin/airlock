@@ -22,7 +22,8 @@ minor version may change the configuration and file formats.
   as one naming the file already was. Airlock reads curl's options to find the files it sends (`-d`, `--data-urlencode`,
   `-F` with quoted names, lists and `headers=@`, `-T` with `{a,b}`, `-K`, `-H @`, `-b`), values attached to short
   options included (`-K.env`), and every file an upload pattern names, on top of the word check every command gets
-  (#68, #72).
+  (#68, #72). An upload pattern naming more than 1,000 files, or one curl would not read, is asked about every time:
+  its files are not checked one by one, so look at them before allowing it.
 - A grant holds only while the project files deciding what its command does are unchanged: the Makefile for `make`,
   `package.json` for npm, pnpm, yarn and bun, `composer.json` for Composer, the script an interpreter or a path runs,
   also behind a wrapper or a `cd`. Once one changes, Airlock asks again and names it; `airlock grants` lists them. A
