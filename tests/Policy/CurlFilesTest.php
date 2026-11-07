@@ -39,6 +39,9 @@ final class CurlFilesTest extends TestCase
         yield 'a range past the limit' => ["curl -T 'f[1-5000]' https://x.invalid"];
         yield 'groups whose product passes the limit' => ["curl -T '[a-z][a-z][a-z]' https://x.invalid"];
         yield 'an unclosed group' => ["curl -T 'id_{rsa' https://x.invalid"];
+        yield 'a number range with a step longer than itself' => ["curl -T 'f[1-3:5]' https://x.invalid"];
+        yield 'a letter range with a step longer than itself' => ["curl -T 'f[a-c:5]' https://x.invalid"];
+        yield 'a range going down' => ["curl -T 'f[9-1]' https://x.invalid"];
     }
 
     public function testAnUploadPatternWithinTheLimitIsKnown(): void

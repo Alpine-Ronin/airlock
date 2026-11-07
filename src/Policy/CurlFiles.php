@@ -304,6 +304,14 @@ final class CurlFiles
     }
 
     /**
+     * Whether a range goes up, by a step no longer than itself: curl refuses the others, and range() throws on them.
+     */
+    private static function fits(int $first, int $last, int $step): bool
+    {
+        return $first <= $last && ($first === $last || $step <= $last - $first);
+    }
+
+    /**
      * The values of a curl range, `a-z`, `1-9` or `01-10`, with an optional step (`:2`); null when it is not one, or
      * holds more than can be checked.
      *
@@ -320,14 +328,14 @@ final class CurlFiles
             return null;
         }
         if (1 === preg_match('/^([a-zA-Z])-([a-zA-Z])$/', $range, $letters)) {
-            return $letters[1] <= $letters[2] ? array_map(strval(...), range($letters[1], $letters[2], $step)) : null;
+            return self::fits(\ord($letters[1]), \ord($letters[2]), $step) ? array_map(strval(...), range($letters[1], $letters[2], $step)) : null;
         }
         if (1 !== preg_match('/^(\d+)-(\d+)$/', $range, $numbers)) {
             return null;
         }
         $first = (int) $numbers[1];
         $last = (int) $numbers[2];
-        if ($last < $first || intdiv($last - $first, $step) + 1 > self::MOST_UPLOADS) {
+        if (!self::fits($first, $last, $step) || intdiv($last - $first, $step) + 1 > self::MOST_UPLOADS) {
             return null;
         }
         $width = str_starts_with($numbers[1], '0') ? \strlen($numbers[1]) : 0;
