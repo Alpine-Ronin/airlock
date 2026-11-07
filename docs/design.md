@@ -30,7 +30,10 @@ allowed to read back.
 3. **Asked.** Anything not covered goes to the user as a form, in their own
    client: what will run, why it is asked, and a choice of *once*, *this
    session*, *always for this project* or *refuse*. A command asked every time
-   only offers *once* or *refuse*.
+   only offers *once* or *refuse*. A grant records the project files that
+   decide what its command does (the Makefile, `package.json`, `composer.json`,
+   the script run) with a hash of each: an agent can edit them, so once one
+   changes the grant no longer covers the command, and the form says which.
 4. **Run.** In a sandbox: bubblewrap on Linux, `sandbox-exec` on macOS. The
    command can write only to the project, `/tmp` and package caches, and cannot
    read Airlock's own files or the user's keys; with `strict`, it has no network.

@@ -3,6 +3,15 @@
 What changed in each release, newest first. Versions follow [semantic versioning](https://semver.org): until 1.0, a
 minor version may change the configuration and file formats.
 
+## Unreleased
+
+### Changed
+
+- A grant holds only while the project files deciding what its command does are unchanged: the Makefile for `make`,
+  `package.json` for npm, pnpm, yarn and bun, `composer.json` for Composer, the script an interpreter or a path runs.
+  Once one changes, Airlock asks again and names it; `airlock grants` lists them. `grants.yaml` gains a `sources` list
+  per grant. A grant from an earlier version, of a command that reads such a file, is asked about once more.
+
 ## 0.4.0 (2026-11-07)
 
 ### Added

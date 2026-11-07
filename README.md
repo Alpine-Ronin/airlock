@@ -336,13 +336,19 @@ Airlock's own files live in `~/.config/airlock/` (or `$XDG_CONFIG_HOME/airlock/`
 | `models.yaml` | What `airlock configure` set up: the model API, its key, the models |
 | `policy.yaml` | Commands you refuse everywhere |
 | `projects/<name>-<hash>/policy.yaml` | Commands you refuse in one project |
-| `projects/<name>-<hash>/grants.yaml` | What *always for this project* allowed |
+| `projects/<name>-<hash>/grants.yaml` | What *always for this project* allowed, with the files each grant needs unchanged |
 | `audit.jsonl` | Every decision, one JSON object per line. At 10 MiB, about 20,000 decisions, it moves to `audit.1.jsonl`, the one before to `audit.2.jsonl`, and so on up to `audit.5.jsonl`: the oldest goes |
 
 From the project, `airlock grants` lists what *always for this project* allowed there, numbered, and
 `airlock grants --revoke <number>` takes one back: Airlock asks about that command again from the next time. A
 *this session* grant lives in the running server and ends with it. `airlock log` shows the last decisions in plain
 words (`--last 50` for more).
+
+A grant holds only while the project files deciding what the command does are unchanged: the Makefile for `make`,
+`package.json` for npm, pnpm, yarn and bun, `composer.json` for Composer, the script for `php bin/console`,
+`sh build.sh` or `./build.sh`. Edit one, and Airlock asks again, naming the file: a granted `make test` would
+otherwise run whatever the Makefile says now, and an agent can edit it. `airlock grants` lists these files for each
+grant. What they load in turn, such as a Makefile's `include` or a script another one calls, is not followed.
 
 A project can also commit `.airlock.yaml`. Like every policy file, it can only refuse:
 
