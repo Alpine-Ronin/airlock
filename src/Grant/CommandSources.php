@@ -55,8 +55,9 @@ final readonly class CommandSources
     }
 
     /**
-     * Whether the line can change a source before the command reading it starts: a command before it, other than a
-     * plain cd, or its own redirection. What a grant vouched for is then checked too early to mean anything.
+     * Whether the line can change a source while the command reading it has not read it yet: a command before it
+     * (other than a plain cd), one running alongside it (later in its pipeline, or after it once it runs in the
+     * background), or its own redirection. What a grant vouched for is then checked too early to mean anything.
      */
     public function canChangeBeforeRead(CommandLine $line): bool
     {
@@ -64,13 +65,34 @@ final readonly class CommandSources
             if ([] === $candidates) {
                 continue;
             }
-            $before = \array_slice($line->commands, 0, $index);
-            if ($writesOwnSource || !array_all($before, $this->isPlainCd(...))) {
+            $others = [...\array_slice($line->commands, 0, $index), ...$this->runningAlongside($line, $index)];
+            if ($writesOwnSource || !array_all($others, $this->isPlainCd(...))) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * The commands after this one that may run while it does: the rest of its pipeline, and everything after the
+     * pipeline when a lone `&` sends it to the background.
+     *
+     * @return list<SimpleCommand>
+     */
+    private function runningAlongside(CommandLine $line, int $index): array
+    {
+        $commands = $line->commands;
+        $last = $index;
+        while (isset($commands[$last + 1]) && $commands[$last + 1]->readsPipe) {
+            ++$last;
+        }
+        $alongside = \array_slice($commands, $index + 1, $last - $index);
+        if ($commands[$last]->runsInBackground) {
+            array_push($alongside, ...\array_slice($commands, $last + 1));
+        }
+
+        return $alongside;
     }
 
     /**
@@ -102,16 +124,66 @@ final readonly class CommandSources
     private function candidates(array $words, array $directories): array
     {
         $candidates = [];
+        $runFrom = $this->withEnvDirectories($words, $directories);
         foreach (Invocations::of($words) as $invocation) {
             if ([] === $invocation) {
                 continue;
             }
-            foreach ($directories as $directory) {
+            foreach ($runFrom as $directory) {
                 array_push($candidates, ...$this->candidatesFrom($invocation, $directory));
             }
         }
 
         return array_values(array_unique($candidates));
+    }
+
+    /**
+     * The directories, and those an `env -C dir` (or `--chdir`) wrapping the program moves it to.
+     *
+     * @param list<string>           $words
+     * @param non-empty-list<string> $directories
+     *
+     * @return non-empty-list<string>
+     */
+    private function withEnvDirectories(array $words, array $directories): array
+    {
+        if ('env' !== basename($words[0] ?? '')) {
+            return $directories;
+        }
+        $runFrom = $directories;
+        foreach ($this->envDirectories($words) as $moved) {
+            foreach ($directories as $directory) {
+                $runFrom[] = $this->resolve($directory, $moved);
+            }
+        }
+
+        return array_values(array_unique($runFrom));
+    }
+
+    /**
+     * Every directory env's -C or --chdir names, as `-C dir`, `-Cdir`, clustered (`-iC dir`) or `--chdir=dir`.
+     *
+     * @param list<string> $words
+     *
+     * @return list<string>
+     */
+    private function envDirectories(array $words): array
+    {
+        $directories = [];
+        for ($index = 1, $count = \count($words); $index < $count; ++$index) {
+            $word = $words[$index];
+            if (str_starts_with($word, '--chdir=')) {
+                $directories[] = substr($word, \strlen('--chdir='));
+            }
+            if ('--chdir' === $word) {
+                $directories[] = $words[++$index] ?? '';
+            }
+            if (1 === preg_match('/^-[A-Za-z]*?C(.*)$/', $word, $cluster)) {
+                $directories[] = '' === $cluster[1] ? ($words[++$index] ?? '') : $cluster[1];
+            }
+        }
+
+        return array_values(array_filter($directories, static fn (string $directory): bool => '' !== $directory));
     }
 
     /**
@@ -141,7 +213,8 @@ final readonly class CommandSources
 
     /**
      * Every argument of an interpreter that may name a file it runs, past its options: any of them that is a project
-     * file counts, as an option's value cannot be told from the script. Inline code runs no file.
+     * file counts, as an option's value cannot be told from the script. Inline code given before any of them runs no
+     * file; after one, such an option is the script's own (`php bin/console x -e prod`).
      *
      * @param non-empty-list<string> $words
      *
@@ -149,12 +222,11 @@ final readonly class CommandSources
      */
     private function scripts(array $words, string $directory): array
     {
-        $arguments = \array_slice($words, 1);
-        if (array_any($arguments, static fn (string $argument): bool => \in_array($argument, CommandPolicy::INLINE_CODE_OPTIONS, true))) {
-            return [];
-        }
         $scripts = [];
-        foreach ($arguments as $argument) {
+        foreach (\array_slice($words, 1) as $argument) {
+            if ([] === $scripts && \in_array($argument, CommandPolicy::INLINE_CODE_OPTIONS, true)) {
+                return [];
+            }
             if (!str_starts_with($argument, '-')) {
                 $scripts[] = $this->resolve($directory, $argument);
             }
@@ -349,7 +421,8 @@ final readonly class CommandSources
                 continue;
             }
             foreach ($directories as $directory) {
-                if (\in_array($this->resolve($directory, $redirection->target), $candidates, true)) {
+                $target = $this->canonical($this->resolve($directory, $redirection->target));
+                if (array_any($candidates, fn (string $candidate): bool => $this->canonical($candidate) === $target)) {
                     return true;
                 }
             }
@@ -359,25 +432,24 @@ final readonly class CommandSources
     }
 
     /**
-     * The path, absolute, with its `.` and `..` read as the shell would before the file exists.
+     * The path, absolute. Its `..` stay: through a symbolic link they lead where the link points, which only the
+     * filesystem knows, and realpath() reads them when the file is hashed.
      */
     private function resolve(string $directory, string $path): string
     {
         $absolute = str_starts_with($path, '/') ? $path : $directory.'/'.$path;
-        $segments = [];
-        foreach (explode('/', $absolute) as $segment) {
-            if ('' === $segment || '.' === $segment) {
-                continue;
-            }
-            if ('..' === $segment) {
-                array_pop($segments);
 
-                continue;
-            }
-            $segments[] = $segment;
-        }
+        return '/'.implode('/', array_filter(explode('/', $absolute), static fn (string $segment): bool => '' !== $segment && '.' !== $segment));
+    }
 
-        return '/'.implode('/', $segments);
+    /**
+     * One spelling per file, present or not: its directory as the filesystem resolves it, then its name.
+     */
+    private function canonical(string $path): string
+    {
+        $directory = realpath(\dirname($path));
+
+        return (false === $directory ? \dirname($path) : $directory).'/'.basename($path);
     }
 
     /**

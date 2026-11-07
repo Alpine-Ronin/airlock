@@ -34,6 +34,9 @@ final class CommandSourcesTest extends TestCase
             $this->filesystem->dumpFile(self::PROJECT.'/'.$file, $file."\n");
         }
         $this->filesystem->dumpFile(self::ROOT.'/outside.sh', "echo outside\n");
+        $this->filesystem->dumpFile(self::PROJECT.'/a/Makefile', "a/Makefile\n");
+        $this->filesystem->mkdir(self::PROJECT.'/a/b');
+        $this->filesystem->symlink('a/b', self::PROJECT.'/link');
     }
 
     #[\Override]
@@ -82,6 +85,10 @@ final class CommandSourcesTest extends TestCase
         yield 'cd past its options' => ['cd -P tools && make test', [[], ['Makefile', 'tools/Makefile']]];
         yield 'cd past --' => ['cd -- src && make', [[], ['Makefile', 'src/Makefile']]];
         yield 'code given inline is not followed' => ['bash -c "sh build.sh"', [[]]];
+        yield 'env -C moves the program it runs' => ['env -C tools make test', [['Makefile', 'tools/Makefile']]];
+        yield 'env -C clustered with other options' => ['env -iC tools make test', [['Makefile', 'tools/Makefile']]];
+        yield 'an option after the script is the script\'s own' => ['php bin/console app:sync -e prod', [['bin/console']]];
+        yield '.. after a symbolic link leads where the link points' => ['make -C link/.. test', [['a/Makefile']]];
     }
 
     #[DataProvider('linesThatCanChangeASourceFirst')]
@@ -101,6 +108,11 @@ final class CommandSourcesTest extends TestCase
         yield 'a redirection before make can write its Makefile' => ['echo all: > Makefile; make', true];
         yield 'make writing its own Makefile' => ['make test > Makefile', true];
         yield 'a script the line creates' => ['touch new.sh; sh new.sh', true];
+        yield 'a command later in make\'s pipeline' => ['make test | cp build.mk Makefile', true];
+        yield 'a command after make sent to the background' => ['make test & cp build.mk Makefile', true];
+        yield 'a command after make\'s pipeline sent to the background' => ['make test | cat & cp build.mk Makefile', true];
+        yield 'make writing its own Makefile by another spelling' => ['make test > src/../Makefile', true];
+        yield 'a command after make has finished' => ['make test && cp build.mk Makefile', false];
         yield 'only a cd before make' => ['cd src && make test', false];
         yield 'make writing elsewhere' => ['make test > out.log', false];
         yield 'make first' => ['make test && ls', false];
