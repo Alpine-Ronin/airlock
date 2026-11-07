@@ -95,6 +95,9 @@ final readonly class CommandPolicy
         foreach ($this->secretFilesNamed($command) as $secret) {
             $concerns[] = [Verdict::AskEveryTime, \sprintf('it names %s, which usually holds secrets', $secret)];
         }
+        if ($this->uploadsUnknownFiles($command)) {
+            $concerns[] = [Verdict::AskEveryTime, 'it uploads the files a pattern names, too many to check'];
+        }
 
         return $concerns;
     }
@@ -243,6 +246,14 @@ final readonly class CommandPolicy
         return true;
     }
 
+    private function uploadsUnknownFiles(SimpleCommand $command): bool
+    {
+        return array_any(
+            Invocations::of($command->programWords()),
+            static fn (array $invocation): bool => 'curl' === basename($invocation[0] ?? '') && CurlFiles::uploadsUnknownFiles($invocation),
+        );
+    }
+
     /**
      * @return list<string>
      */
@@ -252,13 +263,18 @@ final readonly class CommandPolicy
         foreach ($command->redirections as $redirection) {
             $candidates[] = $redirection->target;
         }
+        foreach (Invocations::of($command->programWords()) as $invocation) {
+            if ('curl' === basename($invocation[0] ?? '')) {
+                array_push($candidates, ...CurlFiles::sentBy($invocation));
+            }
+        }
 
         $secrets = [];
         foreach ($candidates as $candidate) {
-            // Each part of an option's or an assignment's value may name a file: --env-file=.env, FILE=id_rsa, and
-            // curl's -F key=@id_rsa;filename=public.txt, key=@a,b or --data-urlencode key@.env, where @ or < sends a
-            // file's content and its name may be quoted (key=@"id_rsa"). The whole word and its value count as well
-            // as each part, as written too: a quote or a comma can be part of a file's name.
+            // Each part of an option's or an assignment's value may name a file: --env-file=.env, FILE=id_rsa,
+            // key=@id_rsa;filename=public.txt. curl's own files come from CurlFiles above; this word check stays for
+            // every program, curl included, so that it only adds to what is found. The whole word and its value count
+            // as well as each part, as written too: a quote or a comma can be part of a file's name.
             $equals = strrpos($candidate, '=');
             $value = false === $equals ? $candidate : substr($candidate, $equals + 1);
             $parts = [$candidate, $value, ...explode('=', str_replace([';', ',', '@'], '=', $candidate))];
