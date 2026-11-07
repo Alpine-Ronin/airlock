@@ -72,6 +72,40 @@ final class GrantsCommandTest extends KernelTestCase
         self::assertMatchesRegularExpression('/While unchanged.*\n.*\n\s+1\s+make test …\s+Makefile/', $tester->getDisplay());
     }
 
+    public function testAPresetAllowsAKindOfProjectsUsualCommandsBoundToTheirFiles(): void
+    {
+        $this->filesystem->dumpFile(self::PROJECT.'/composer.json', "{}\n");
+        $tester = $this->tester();
+
+        $tester->setInputs(['yes']);
+        $status = $tester->execute(['--preset' => 'php']);
+
+        self::assertSame(Command::SUCCESS, $status, $tester->getDisplay());
+        $grants = $this->grants()->all();
+        self::assertContainsEquals(new Grant(['vendor/bin/phpunit'], true), $grants, 'vendor/bin/phpunit does not exist yet: the grant records no file for it.');
+        self::assertContainsEquals(new Grant(['composer', 'test'], true, [new Source('composer.json', hash('sha256', "{}\n"))]), $grants);
+        self::assertStringContainsString('Allowed always', $tester->getDisplay());
+    }
+
+    public function testAPresetDeclinedAllowsNothing(): void
+    {
+        $tester = $this->tester();
+
+        $tester->setInputs(['no']);
+        $tester->execute(['--preset' => 'node']);
+
+        self::assertSame([], $this->grants()->all());
+        self::assertStringContainsString('npm run lint …', $tester->getDisplay(), 'What a preset allows is shown before the user agrees.');
+    }
+
+    public function testAnUnknownPresetIsRefused(): void
+    {
+        $tester = $this->tester();
+
+        self::assertSame(Command::FAILURE, $tester->execute(['--preset' => 'cobol']));
+        self::assertStringContainsString('No preset is named "cobol": php, node, python.', $tester->getDisplay());
+    }
+
     public function testTheGrantsAreListedByNumber(): void
     {
         $this->grants()->add([new Grant(['make', 'test'], true), new Grant(['ls', '-la'], false)]);

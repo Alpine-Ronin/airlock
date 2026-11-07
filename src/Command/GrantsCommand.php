@@ -7,6 +7,8 @@ namespace App\Command;
 use App\Execution\ProjectDirectory;
 use App\Grant\Grant;
 use App\Grant\InvalidGrantsException;
+use App\Grant\Preset;
+use App\Grant\PresetGrants;
 use App\Grant\ProjectGrants;
 use App\Grant\Source;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -17,15 +19,17 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
- * The commands the user allowed always in the project, and a way to take one back without editing a file. Grants for
- * a session live in the server that was given them, and end with it.
+ * The commands the user allowed always in the project, a way to take one back without editing a file, and to allow a
+ * kind of project's usual commands in one step. Grants for a session live in the server that was given them, and end
+ * with it.
  */
-#[AsCommand(name: 'grants', description: 'List the commands allowed always in this project, or revoke some')]
+#[AsCommand(name: 'grants', description: 'List the commands allowed always in this project, revoke some, or allow a preset')]
 final class GrantsCommand extends Command
 {
     public function __construct(
         private readonly ProjectGrants $grants,
         private readonly ProjectDirectory $projectDirectory,
+        private readonly PresetGrants $presetGrants,
     ) {
         parent::__construct();
     }
@@ -33,7 +37,8 @@ final class GrantsCommand extends Command
     #[\Override]
     protected function configure(): void
     {
-        $this->addOption('revoke', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'The number of a grant to revoke, as listed; repeat it for several');
+        $this->addOption('revoke', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'The number of a grant to revoke, as listed; repeat it for several')
+            ->addOption('preset', null, InputOption::VALUE_REQUIRED, \sprintf('Allow always the usual commands of a kind of project (tests, linters, analysis): %s', implode(', ', array_map(static fn (Preset $preset): string => $preset->value, Preset::cases()))));
     }
 
     #[\Override]
@@ -46,6 +51,11 @@ final class GrantsCommand extends Command
             $io->error($e->getMessage());
 
             return Command::FAILURE;
+        }
+
+        $preset = $input->getOption('preset');
+        if (\is_string($preset)) {
+            return $this->allowPreset($io, $preset);
         }
 
         $numbers = $input->getOption('revoke');
@@ -77,6 +87,34 @@ final class GrantsCommand extends Command
             'A command ending in … also allows longer ones starting with it.',
             'Revoke one with: airlock grants --revoke <number>',
         ]);
+
+        return Command::SUCCESS;
+    }
+
+    private function allowPreset(SymfonyStyle $io, string $name): int
+    {
+        $preset = Preset::tryFrom(strtolower($name));
+        if (!$preset instanceof Preset) {
+            $io->error(\sprintf('No preset is named "%s": %s.', $name, implode(', ', array_map(static fn (Preset $known): string => $known->value, Preset::cases()))));
+
+            return Command::FAILURE;
+        }
+
+        $grants = $this->presetGrants->for($preset);
+        $numbered = [];
+        foreach ($grants as $index => $grant) {
+            $numbered[$index + 1] = $grant;
+        }
+        $this->show($io, $numbered);
+        $io->text('Each runs in the sandbox, and is asked about again once a file it lists changes. A test runner runs the project\'s own code.');
+        if (!$io->confirm(\sprintf('Allow these commands always in %s?', $this->projectDirectory->path), true)) {
+            $io->text('Nothing was allowed.');
+
+            return Command::SUCCESS;
+        }
+
+        $this->grants->add($grants);
+        $io->success('Allowed always. airlock grants lists them; airlock grants --revoke <number> takes one back.');
 
         return Command::SUCCESS;
     }
