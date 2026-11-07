@@ -158,7 +158,7 @@ jobs:
                   cd "$(mktemp -d)" && "$binary" connect codex --no-interaction
                   grep -Fx "command = \"$binary\"" "$HOME/.codex/config.toml"
 
-            # What a user runs in a terminal, on every target: the help, doctor on the sandbox there, and log after a command.
+            # What a user runs in a terminal, on every target: the help, doctor on the sandbox there (network open by default), and log after a command.
             - name: Run Airlock's own commands
               shell: bash
               run: |
@@ -169,7 +169,8 @@ jobs:
                   grep -F 'every agent command passes through it' help.txt
                   if grep -F 'cache:clear' help.txt; then exit 1; fi
                   "$binary" doctor | tee doctor.txt
-                  grep -E '✔ Sandbox: Sandbox \((bubblewrap|sandbox-exec)\)' doctor.txt
+                  grep -E '! Sandbox: Sandbox \((bubblewrap|sandbox-exec)\)' doctor.txt
+                  grep -F 'Commands can reach the network' doctor.txt
                   python3 "$GITHUB_WORKSPACE/.github/scripts/smoke.py" -- "$binary" mcp:server
                   "$binary" log | tee log.txt
                   grep -F 'allowed once' log.txt
