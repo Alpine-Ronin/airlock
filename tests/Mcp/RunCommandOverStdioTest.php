@@ -219,6 +219,18 @@ final class RunCommandOverStdioTest extends TestCase
         self::assertFileExists(new ConfigDirectory($this->home)->forProject($this->project).'/grants.yaml');
     }
 
+    public function testAGrantedScriptIsAskedAboutAgainOnceItChanges(): void
+    {
+        $this->filesystem->dumpFile($this->project.'/run.sh', "echo first\n");
+        $client = $this->client();
+        $client->request($this->modernCall(2, 'sh run.sh', 'session', $this->askState($client, 'sh run.sh')));
+        $this->filesystem->dumpFile($this->project.'/run.sh', "echo second\n");
+
+        $form = $this->firstForm($client, 'sh run.sh');
+
+        self::assertStringContainsString('Asked again: what it runs depends on `run.sh`, which changed since it was allowed', $this->text($form, 'message'));
+    }
+
     public function testWithoutASandboxAGrantForThisProjectRunsNothingWithoutAsking(): void
     {
         $client = $this->client(['AIRLOCK_SANDBOX' => 'off']);
