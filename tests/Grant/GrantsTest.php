@@ -8,6 +8,7 @@ use App\Configuration\ConfigDirectory;
 use App\Execution\ProjectDirectory;
 use App\Grant\CommandSources;
 use App\Grant\Grant;
+use App\Grant\GrantMiss;
 use App\Grant\GrantRules;
 use App\Grant\Grants;
 use App\Grant\ProjectGrants;
@@ -106,6 +107,31 @@ final class GrantsTest extends TestCase
         $this->filesystem->dumpFile(self::PROJECT.'/Makefile', "test:\n\ttrue\n");
 
         self::assertFalse($this->grants->covers(new ShellParser()->parse('make test')));
+    }
+
+    public function testGrantedCommandsThatReplaceTheMakefileBeforeMakeReadsItAreAskedAbout(): void
+    {
+        $this->session->add($this->rules->for(new ShellParser()->parse('cp evil.mk Makefile')));
+        $this->session->add($this->rules->for(new ShellParser()->parse('make test')));
+        $line = new ShellParser()->parse('cp evil.mk Makefile && make test');
+
+        self::assertFalse($this->grants->covers($line), 'The Makefile would be replaced after it was checked, before make reads it.');
+        self::assertEquals(GrantMiss::changeableBeforeRead(), $this->grants->miss($line));
+    }
+
+    public function testAWrappedMakeIsAskedAboutAgainOnceItsMakefileChanges(): void
+    {
+        $this->session->add($this->rules->for(new ShellParser()->parse('timeout 5 make test')));
+        $this->filesystem->dumpFile(self::PROJECT.'/Makefile', "test:\n\ttrue\n");
+        $line = new ShellParser()->parse('timeout 5 make test');
+
+        self::assertFalse($this->grants->covers($line));
+        self::assertEquals(GrantMiss::changedSources(['Makefile']), $this->grants->miss($line));
+    }
+
+    public function testACommandNoGrantCoversHasNoMiss(): void
+    {
+        self::assertNull($this->grants->miss(new ShellParser()->parse('make test')));
     }
 
     public function testACommandNoGrantCoversHasNoStaleSources(): void

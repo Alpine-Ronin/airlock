@@ -228,7 +228,7 @@ final class RunCommandOverStdioTest extends TestCase
 
         $form = $this->firstForm($client, 'sh run.sh');
 
-        self::assertStringContainsString('Asked again: what it runs depends on `run.sh`, which changed since it was allowed', $this->text($form, 'message'));
+        self::assertStringContainsString('Asked again: what it runs depends on "run.sh", which changed since it was allowed', $this->text($form, 'message'));
     }
 
     public function testWithoutASandboxAGrantForThisProjectRunsNothingWithoutAsking(): void

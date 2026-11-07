@@ -73,6 +73,38 @@ final class CommandSourcesTest extends TestCase
         yield 'an interpreter running code reads no file' => ['php -r "echo 1;"', [[]]];
         yield 'a file outside the project does not count: no command can write there' => ['sh ../outside.sh', [[]]];
         yield 'a file that does not exist is not one' => ['sh missing.sh', [[]]];
+        yield 'make by its path still reads its Makefile' => ['/usr/bin/make test', [['Makefile']]];
+        yield 'a wrapped make reads its Makefile' => ['timeout 5 make test', [['Makefile']]];
+        yield 'a script after interpreter options' => ['sh -x build.sh', [['build.sh']]];
+        yield 'make -C clustered with other options' => ['make -sC tools test', [['tools/Makefile']]];
+        yield 'every make -C in turn' => ['make -C src -C ../tools test', [['tools/Makefile']]];
+        yield 'every make -f' => ['make -f build.mk -f Makefile', [['build.mk', 'Makefile']]];
+        yield 'cd past its options' => ['cd -P tools && make test', [[], ['Makefile', 'tools/Makefile']]];
+        yield 'cd past --' => ['cd -- src && make', [[], ['Makefile', 'src/Makefile']]];
+        yield 'code given inline is not followed' => ['bash -c "sh build.sh"', [[]]];
+    }
+
+    #[DataProvider('linesThatCanChangeASourceFirst')]
+    public function testALineThatCanChangeASourceBeforeItIsReadIsSaidSo(string $line, bool $expected): void
+    {
+        $sources = new CommandSources(new ProjectDirectory(self::PROJECT));
+
+        self::assertSame($expected, $sources->canChangeBeforeRead(new ShellParser()->parse($line)));
+    }
+
+    /**
+     * @return iterable<string, array{string, bool}>
+     */
+    public static function linesThatCanChangeASourceFirst(): iterable
+    {
+        yield 'a command before make can replace its Makefile' => ['cp build.mk Makefile && make test', true];
+        yield 'a redirection before make can write its Makefile' => ['echo all: > Makefile; make', true];
+        yield 'make writing its own Makefile' => ['make test > Makefile', true];
+        yield 'a script the line creates' => ['touch new.sh; sh new.sh', true];
+        yield 'only a cd before make' => ['cd src && make test', false];
+        yield 'make writing elsewhere' => ['make test > out.log', false];
+        yield 'make first' => ['make test && ls', false];
+        yield 'nothing reads a project file' => ['ls && echo hi', false];
     }
 
     public function testTheHashIsTheFilesContent(): void

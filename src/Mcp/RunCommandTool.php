@@ -82,7 +82,7 @@ final readonly class RunCommandTool
             $assessment = $this->policy->assess($line, $this->policyFiles->refusals());
             // A grant was given for a command that stays in the sandbox: without one, every command is asked.
             $isCovered = Verdict::Plain === $assessment->verdict && !$this->sandboxDetector->detect() instanceof NoSandbox && $this->grants->covers($line);
-            $staleSources = $isCovered || Verdict::Plain !== $assessment->verdict ? [] : $this->grants->staleSources($line);
+            $miss = $isCovered || Verdict::Plain !== $assessment->verdict ? null : $this->grants->miss($line);
         } catch (InvalidPolicyException|InvalidGrantsException $e) {
             $this->audit($command, new Assessment(Verdict::Refused), Outcome::Failed, detail: $e->getMessage());
 
@@ -107,7 +107,7 @@ final readonly class RunCommandTool
         if (!$decision instanceof Decision) {
             $plainWords = Verdict::AskEveryTime === $assessment->verdict ? $this->riskExplainer->explain($command) : null;
 
-            return $this->approvals->ask($context, $command, $this->approvalForm->request($command, $assessment, $this->grantRules->for($line), $plainWords, $staleSources));
+            return $this->approvals->ask($context, $command, $this->approvalForm->request($command, $assessment, $this->grantRules->for($line), $plainWords, $miss));
         }
 
         return $this->decide($decision, $command, $line, $assessment);

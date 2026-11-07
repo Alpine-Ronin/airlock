@@ -20,14 +20,15 @@ final readonly class Grants
     }
 
     /**
-     * Every simple command of the line covered by a grant that vouches for the sources it reads now. Whether the line
-     * may be covered at all is the policy's call: a line asked about every time never is.
+     * Every simple command of the line covered by a grant that vouches for the sources it reads now, on a line that
+     * cannot change them first. Whether the line may be covered at all is the policy's call: a line asked about every
+     * time never is.
      *
      * @throws InvalidGrantsException
      */
     public function covers(CommandLine $line): bool
     {
-        if ([] === $line->commands) {
+        if ([] === $line->commands || $this->sources->canChangeBeforeRead($line)) {
             return false;
         }
         $grants = $this->all();
@@ -40,6 +41,30 @@ final readonly class Grants
         }
 
         return true;
+    }
+
+    /**
+     * Why grants covering every command's words still do not let the line run; null when one command's words are
+     * covered by no grant at all, or when the line is covered.
+     *
+     * @throws InvalidGrantsException
+     */
+    public function miss(CommandLine $line): ?GrantMiss
+    {
+        if ([] === $line->commands || $this->covers($line)) {
+            return null;
+        }
+        $grants = $this->all();
+        $isEveryCommandGranted = array_all($line->commands, static fn (SimpleCommand $command): bool => array_any($grants, static fn (Grant $grant): bool => $grant->covers($command)));
+        if (!$isEveryCommandGranted) {
+            return null;
+        }
+        $stale = $this->staleSources($line);
+        if ([] !== $stale) {
+            return GrantMiss::changedSources($stale);
+        }
+
+        return GrantMiss::changeableBeforeRead();
     }
 
     /**
