@@ -7,16 +7,19 @@ namespace App\Grant;
 use App\Shell\SimpleCommand;
 
 /**
- * Lets one simple command run without asking: exactly these words, or these words followed by any others.
+ * Lets one simple command run without asking: exactly these words, or these words followed by any others, as long as
+ * the project files deciding what it does are as they were when it was given.
  */
 final readonly class Grant
 {
     /**
      * @param non-empty-list<string> $words
+     * @param list<Source>           $sources the files deciding what the command did when it was given
      */
     public function __construct(
         public array $words,
         public bool $coversLongerCommands,
+        public array $sources = [],
     ) {
     }
 
@@ -27,6 +30,26 @@ final readonly class Grant
         }
 
         return \array_slice($command->words, 0, \count($this->words)) === $this->words;
+    }
+
+    /**
+     * The paths of the sources a command reads now that this grant does not vouch for: changed since it was given,
+     * or not read by the command then.
+     *
+     * @param list<Source> $current
+     *
+     * @return list<string>
+     */
+    public function staleSources(array $current): array
+    {
+        $stale = [];
+        foreach ($current as $source) {
+            if (!array_any($this->sources, $source->matches(...))) {
+                $stale[] = $source->path;
+            }
+        }
+
+        return $stale;
     }
 
     /**

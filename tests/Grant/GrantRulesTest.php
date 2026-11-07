@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Grant;
 
+use App\Execution\ProjectDirectory;
+use App\Grant\CommandSources;
 use App\Grant\Grant;
 use App\Grant\GrantRules;
 use App\Shell\ShellParser;
@@ -18,7 +20,7 @@ final class GrantRulesTest extends TestCase
     #[DataProvider('lines')]
     public function testAGrantCoversTheProgramAndItsFirstArgumentOrExactlyTheCommand(string $line, array $expected): void
     {
-        $grants = new GrantRules()->for(new ShellParser()->parse($line));
+        $grants = new GrantRules(new CommandSources(new ProjectDirectory(__DIR__)))->for(new ShellParser()->parse($line));
 
         self::assertSame($expected, array_map(static fn (Grant $grant): string => $grant->describe(), $grants));
     }
@@ -48,7 +50,7 @@ final class GrantRulesTest extends TestCase
     public function testWhatAGrantCovers(string $granted, string $asked, bool $expected): void
     {
         $parser = new ShellParser();
-        $grant = new GrantRules()->for($parser->parse($granted))[0];
+        $grant = new GrantRules(new CommandSources(new ProjectDirectory(__DIR__)))->for($parser->parse($granted))[0];
 
         self::assertSame($expected, $grant->covers($parser->parse($asked)->commands[0]));
     }

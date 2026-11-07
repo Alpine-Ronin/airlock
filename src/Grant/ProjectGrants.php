@@ -47,21 +47,15 @@ final readonly class ProjectGrants
     }
 
     /**
+     * A grant given again replaces the one it equals: it holds the sources as they are now.
+     *
      * @param list<Grant> $grants
      *
      * @throws InvalidGrantsException when the file cannot be read: it is never guessed at
      */
     public function add(array $grants): void
     {
-        $this->update(static function (array $kept) use ($grants): array {
-            foreach ($grants as $grant) {
-                if (!array_any($kept, $grant->equals(...))) {
-                    $kept[] = $grant;
-                }
-            }
-
-            return $kept;
-        });
+        $this->update(static fn (array $kept): array => GrantList::with($kept, $grants));
     }
 
     /**
@@ -126,11 +120,16 @@ final readonly class ProjectGrants
     }
 
     /**
-     * @return array{command: list<string>, prefix: bool}
+     * @return array{command: list<string>, prefix: bool, sources?: list<array{path: string, sha256: string}>}
      */
     private function normalize(Grant $grant): array
     {
-        return ['command' => $grant->words, 'prefix' => $grant->coversLongerCommands];
+        $entry = ['command' => $grant->words, 'prefix' => $grant->coversLongerCommands];
+        if ([] !== $grant->sources) {
+            $entry['sources'] = array_map(static fn (Source $source): array => ['path' => $source->path, 'sha256' => $source->sha256], $grant->sources);
+        }
+
+        return $entry;
     }
 
     /**
@@ -153,7 +152,7 @@ final readonly class ProjectGrants
 
     private function denormalize(mixed $entry, string $file): Grant
     {
-        $invalid = new InvalidGrantsException(\sprintf('The grants file %s holds an entry that is not {command: [words], prefix: true|false}.', $file));
+        $invalid = new InvalidGrantsException(\sprintf('The grants file %s holds an entry that is not {command: [words], prefix: true|false, sources: [{path, sha256}]}.', $file));
         $command = \is_array($entry) ? ($entry['command'] ?? null) : null;
         $prefix = \is_array($entry) ? ($entry['prefix'] ?? null) : null;
         if (!\is_array($command) || !array_is_list($command) || !\is_bool($prefix)) {
@@ -171,6 +170,27 @@ final readonly class ProjectGrants
             throw $invalid;
         }
 
-        return new Grant($words, $prefix);
+        return new Grant($words, $prefix, $this->sourcesIn($entry['sources'] ?? [], $invalid));
+    }
+
+    /**
+     * @return list<Source>
+     */
+    private function sourcesIn(mixed $entries, InvalidGrantsException $invalid): array
+    {
+        if (!\is_array($entries) || !array_is_list($entries)) {
+            throw $invalid;
+        }
+        $sources = [];
+        foreach ($entries as $entry) {
+            $path = \is_array($entry) ? ($entry['path'] ?? null) : null;
+            $sha256 = \is_array($entry) ? ($entry['sha256'] ?? null) : null;
+            if (!\is_string($path) || !\is_string($sha256)) {
+                throw $invalid;
+            }
+            $sources[] = new Source($path, $sha256);
+        }
+
+        return $sources;
     }
 }
