@@ -367,6 +367,12 @@ From the project, `airlock grants` lists what *always for this project* allowed 
 *this session* grant lives in the running server and ends with it. `airlock log` shows the last decisions in plain
 words (`--last 50` for more).
 
+`airlock grants --preset php` (or `node`, `python`) allows a kind of project's usual commands always, in one step,
+once you agree to the list it shows: tests, linters and static analysis (`vendor/bin/phpunit`, `composer test`,
+`npm run lint`, `pytest`, `ruff check`…), never an install, a delete, a push or a download. Each is bound to its files
+like any grant. A test runner still runs the project's own code, in the sandbox. `airlock doctor` suggests the preset
+a project's files point to (`composer.json`, `package.json`, `pyproject.toml`) while nothing is allowed there.
+
 A grant holds only while the project files deciding what the command does are unchanged: the Makefile for `make`,
 `package.json` for npm, pnpm, yarn and bun, `composer.json` for Composer, the script for `php bin/console`,
 `sh build.sh` or `./build.sh`, also behind a wrapper (`timeout 5 make test`) or a `cd`. Edit one, and Airlock asks
