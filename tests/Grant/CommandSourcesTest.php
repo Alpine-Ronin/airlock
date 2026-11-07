@@ -37,6 +37,7 @@ final class CommandSourcesTest extends TestCase
         $this->filesystem->dumpFile(self::PROJECT.'/a/Makefile', "a/Makefile\n");
         $this->filesystem->mkdir(self::PROJECT.'/a/b');
         $this->filesystem->symlink('a/b', self::PROJECT.'/link');
+        $this->filesystem->symlink('Makefile', self::PROJECT.'/alias');
     }
 
     #[\Override]
@@ -112,6 +113,7 @@ final class CommandSourcesTest extends TestCase
         yield 'a command after make sent to the background' => ['make test & cp build.mk Makefile', true];
         yield 'a command after make\'s pipeline sent to the background' => ['make test | cat & cp build.mk Makefile', true];
         yield 'make writing its own Makefile by another spelling' => ['make test > src/../Makefile', true];
+        yield 'make writing its own Makefile through a symbolic link' => ['make test > alias', true];
         yield 'a command after make has finished' => ['make test && cp build.mk Makefile', false];
         yield 'only a cd before make' => ['cd src && make test', false];
         yield 'make writing elsewhere' => ['make test > out.log', false];

@@ -443,10 +443,15 @@ final readonly class CommandSources
     }
 
     /**
-     * One spelling per file, present or not: its directory as the filesystem resolves it, then its name.
+     * One spelling per file, present or not: the file as the filesystem resolves it, a symbolic link to it included,
+     * else its directory so resolved, then its name.
      */
     private function canonical(string $path): string
     {
+        $file = realpath($path);
+        if (false !== $file) {
+            return $file;
+        }
         $directory = realpath(\dirname($path));
 
         return (false === $directory ? \dirname($path) : $directory).'/'.basename($path);
