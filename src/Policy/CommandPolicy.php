@@ -32,7 +32,7 @@ final readonly class CommandPolicy
     private const array SSH_CLIENTS = ['ssh', 'scp', 'sftp'];
 
     /** Options with which an interpreter runs code given on its command line rather than what it reads. */
-    private const array INLINE_CODE_OPTIONS = ['-c', '-e', '-r', '-m'];
+    public const array INLINE_CODE_OPTIONS = ['-c', '-e', '-r', '-m'];
 
     /** Find actions that change files or run a command on each file found. */
     private const array FIND_ACTIONS = ['-delete', '-exec', '-execdir', '-ok', '-okdir'];
@@ -105,7 +105,7 @@ final readonly class CommandPolicy
      */
     private function refusalMatching(array $words, array $refusals): ?RefusedCommand
     {
-        foreach ($this->invocations($words) as $invocation) {
+        foreach (Invocations::of($words) as $invocation) {
             foreach ($refusals as $refusal) {
                 if ($this->startsWith($invocation, $refusal->words)) {
                     return $refusal;
@@ -136,7 +136,7 @@ final readonly class CommandPolicy
      */
     private function danger(array $words, bool $readsPipe, bool $isDownloadPiped): ?Danger
     {
-        foreach ($this->invocations($words) as $invocation) {
+        foreach (Invocations::of($words) as $invocation) {
             $danger = $this->dangerOfProgram($invocation, $readsPipe, $isDownloadPiped);
             if ($danger instanceof Danger) {
                 return $danger;
@@ -151,7 +151,7 @@ final readonly class CommandPolicy
      */
     private function reachesARemote(array $words): bool
     {
-        foreach ($this->invocations($words) as $invocation) {
+        foreach (Invocations::of($words) as $invocation) {
             $program = basename($invocation[0] ?? '');
             $arguments = \array_slice($invocation, 1);
             $isRemoteGit = 'git' === $program
@@ -162,28 +162,6 @@ final readonly class CommandPolicy
         }
 
         return false;
-    }
-
-    /**
-     * The command itself, and when its program only runs another, every way of reading which one: a wrapper's own
-     * options can take values (timeout -s KILL 5 rm -rf x), so any later word may be the program it runs.
-     *
-     * @param list<string> $words
-     *
-     * @return list<list<string>>
-     */
-    private function invocations(array $words): array
-    {
-        if ([] === $words || !\in_array(basename($words[0]), self::WRAPPERS, true)) {
-            return [$words];
-        }
-
-        $invocations = [$words];
-        for ($start = 1, $count = \count($words); $start < $count; ++$start) {
-            $invocations[] = \array_slice($words, $start);
-        }
-
-        return $invocations;
     }
 
     /**
