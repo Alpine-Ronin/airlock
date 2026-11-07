@@ -20,8 +20,8 @@ minor version may change the configuration and file formats.
   VS Code's terminal: picked in the chat, the agent runs commands only through Airlock. `--remove` takes it back.
   VS Code runs end to end (1.145) (#60).
 - `airlock configure` shows how long each model took to calibrate, and `--fastest` keeps calibrating up to
-  `--max-probes` and keeps the fastest model that passes, instead of the first: the fastest fit for both checks, else
-  the fastest for each (#61).
+  `--max-probes` models that answer and keeps the fastest that passes, instead of the first: the fastest fit for both
+  checks, else the fastest for each (#61).
 - `airlock doctor` and `airlock log` warn when the output check timed out on 3 or more of the project's last 20
   decisions, and suggest `airlock configure --fastest` (#61).
 
