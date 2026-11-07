@@ -8,6 +8,7 @@ use App\Configuration\ConfigDirectory;
 use App\Execution\ProjectDirectory;
 use App\Grant\Grant;
 use App\Grant\ProjectGrants;
+use App\Grant\Source;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Console\Command\Command;
@@ -59,6 +60,16 @@ final class GrantsCommandTest extends KernelTestCase
 
         self::assertSame(Command::SUCCESS, $tester->execute([]));
         self::assertStringContainsString('No command is allowed always in this project', $tester->getDisplay());
+    }
+
+    public function testAGrantIsListedWithTheFilesItNeedsUnchanged(): void
+    {
+        $this->grants()->add([new Grant(['make', 'test'], true, [new Source('Makefile', hash('sha256', 'test:'))])]);
+        $tester = $this->tester();
+
+        $tester->execute([]);
+
+        self::assertMatchesRegularExpression('/While unchanged.*\n.*\n\s+1\s+make test …\s+Makefile/', $tester->getDisplay());
     }
 
     public function testTheGrantsAreListedByNumber(): void
