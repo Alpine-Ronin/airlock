@@ -23,4 +23,9 @@ interface Sandbox
      * One line saying what a command can do in it, or why there is none.
      */
     public function describe(): string;
+
+    /**
+     * Whether a command in it can reach no network: without a sandbox, it can.
+     */
+    public function cutsNetwork(): bool;
 }
