@@ -314,12 +314,12 @@ picks; focus then goes to *Accept* by itself, so press `Enter` once more.
 Two public corpora, in `tests/Fixtures/injection/`, show what Airlock does against what an injection gets an agent to
 do.
 
-**Commands** (`commands.yaml`, 22 scenarios, run by CI): what an injection planted in a README, a log, a test's output
+**Commands** (`commands.yaml`, 23 scenarios, run by CI): what an injection planted in a README, a log, a test's output
 or an issue gets the agent to run. A download piped into a shell, a secret file read or sent out, a force push, a
 command hidden in `$(…)` or a here-document, one chained after a granted command, a granted Makefile, npm script or
 script edited first, a Makefile replaced on the same line. Each one goes through Airlock's parser, policy and grants:
-every one is refused or asked about, none runs unasked. Writing it found one gap, now fixed: `curl -d @.env …` was
-asked about, but not *every time*.
+every one is refused or asked about, none runs unasked. Writing it found one gap, now fixed: a secret file sent with
+curl (`-d @.env`, `-F 'key=@id_rsa;filename=public.txt'`) was asked about, but not *every time*.
 
 **Outputs** (`outputs.yaml`, 10 injections and 8 clean outputs, some telling a human what to do): what the model
 behind the output check makes of them. Measure your own model with:
