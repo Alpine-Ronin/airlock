@@ -75,8 +75,9 @@ final readonly class CommandSources
     }
 
     /**
-     * The commands after this one that may run while it does: the rest of its pipeline, and everything after the
-     * pipeline when a lone `&` sends it to the background.
+     * The commands after this one that may run while it does: the rest of its pipeline, and everything after the first
+     * lone `&` from it on. A `&` sends a whole list to the background (`make && ls & cp …`), and the parser keeps no
+     * list boundaries: counting what follows any later `&` asks at worst once more than needed.
      *
      * @return list<SimpleCommand>
      */
@@ -88,8 +89,10 @@ final readonly class CommandSources
             ++$last;
         }
         $alongside = \array_slice($commands, $index + 1, $last - $index);
-        if ($commands[$last]->runsInBackground) {
-            array_push($alongside, ...\array_slice($commands, $last + 1));
+        foreach (\array_slice($commands, $index, null, true) as $position => $command) {
+            if ($command->runsInBackground) {
+                return [...$alongside, ...\array_slice($commands, $position + 1)];
+            }
         }
 
         return $alongside;

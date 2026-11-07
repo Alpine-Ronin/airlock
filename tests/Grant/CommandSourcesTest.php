@@ -114,6 +114,7 @@ final class CommandSourcesTest extends TestCase
         yield 'a command after make\'s pipeline sent to the background' => ['make test | cat & cp build.mk Makefile', true];
         yield 'make writing its own Makefile by another spelling' => ['make test > src/../Makefile', true];
         yield 'make writing its own Makefile through a symbolic link' => ['make test > alias', true];
+        yield 'a command after a list holding make, sent to the background' => ['make test && ls & cp build.mk Makefile', true];
         yield 'a command after make has finished' => ['make test && cp build.mk Makefile', false];
         yield 'only a cd before make' => ['cd src && make test', false];
         yield 'make writing elsewhere' => ['make test > out.log', false];
