@@ -129,6 +129,16 @@ final class GrantsTest extends TestCase
         self::assertEquals(GrantMiss::changedSources(['Makefile']), $this->grants->miss($line));
     }
 
+    public function testAMakeRunByItsPathIsAskedAboutAgainOnceItsMakefileChanges(): void
+    {
+        $this->session->add($this->rules->for(new ShellParser()->parse('/usr/bin/make test')));
+        $this->filesystem->dumpFile(self::PROJECT.'/Makefile', "test:\n\ttrue\n");
+        $line = new ShellParser()->parse('/usr/bin/make test');
+
+        self::assertFalse($this->grants->covers($line));
+        self::assertEquals(GrantMiss::changedSources(['Makefile']), $this->grants->miss($line));
+    }
+
     public function testAMakeMovedByEnvIsAskedAboutAgainOnceTheMakefileThereChanges(): void
     {
         $this->filesystem->dumpFile(self::PROJECT.'/tools/Makefile', "test:\n\ttrue\n");
