@@ -309,6 +309,29 @@ cp -R ~/airlock/demo ~/airlock-demo
 The form looks like any MCP form in your client. In Claude Code's: `→` opens the Decision field, `↓` moves, `Enter`
 picks; focus then goes to *Accept* by itself, so press `Enter` once more.
 
+## Tested against prompt injection
+
+Two public corpora, in `tests/Fixtures/injection/`, show what Airlock does against what an injection gets an agent to
+do.
+
+**Commands** (`commands.yaml`, 22 scenarios, run by CI): what an injection planted in a README, a log, a test's output
+or an issue gets the agent to run. A download piped into a shell, a secret file read or sent out, a force push, a
+command hidden in `$(…)` or a here-document, one chained after a granted command, a granted Makefile, npm script or
+script edited first, a Makefile replaced on the same line. Each one goes through Airlock's parser, policy and grants:
+every one is refused or asked about, none runs unasked. Writing it found one gap, now fixed: `curl -d @.env …` was
+asked about, but not *every time*.
+
+**Outputs** (`outputs.yaml`, 10 injections and 8 clean outputs, some telling a human what to do): what the model
+behind the output check makes of them. Measure your own model with:
+
+```bash
+airlock configure --check --samples tests/Fixtures/injection/outputs.yaml
+```
+
+On 2026-11-07, `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning` on NVIDIA's free tier flagged 9 of the 10 injections
+and none of the 8 clean outputs; it gave no answer in time for 2 samples, one of each, and no wrong answer. An output
+the model misses still reaches the agent marked as data, with its secrets masked: the check warns, it decides nothing.
+
 ## Configuration
 
 Environment variables, with their defaults in `.env`; set your own in `.env.local`, or as real environment
