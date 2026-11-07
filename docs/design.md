@@ -124,7 +124,12 @@ Symfony 8.1, the MCP bundle, PHP 8.5. Every class `final`, value objects
 `readonly`, `declare(strict_types=1)` everywhere, PHPStan at its highest level
 with strict rules and no baseline, PHP CS Fixer on `@Symfony` and its risky
 set, Rector, and one `composer check` that CI runs. PHPUnit: the parser and the
-policy by their public API; the server through both protocol eras over stdio;
+policy by their public API; random lines with fixed seeds, in two suites: one
+runs them in bash and checks every command bash runs is one the parser read,
+the other passes them through the policy and grants for their properties (no
+grant covers an ungranted command on its line, no part makes a line milder); a
+public corpus of injected commands; the server through both protocol eras over
+stdio;
 the model calls against recorded responses, so the tests never reach the
 network. And tested by hand in a real
 client before each change is merged.
