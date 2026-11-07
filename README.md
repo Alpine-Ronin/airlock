@@ -346,9 +346,11 @@ words (`--last 50` for more).
 
 A grant holds only while the project files deciding what the command does are unchanged: the Makefile for `make`,
 `package.json` for npm, pnpm, yarn and bun, `composer.json` for Composer, the script for `php bin/console`,
-`sh build.sh` or `./build.sh`. Edit one, and Airlock asks again, naming the file: a granted `make test` would
-otherwise run whatever the Makefile says now, and an agent can edit it. `airlock grants` lists these files for each
-grant. What they load in turn, such as a Makefile's `include` or a script another one calls, is not followed.
+`sh build.sh` or `./build.sh`, also behind a wrapper (`timeout 5 make test`) or a `cd`. Edit one, and Airlock asks
+again, naming the file: a granted `make test` would otherwise run whatever the Makefile says now, and an agent can edit
+it. A line that can change such a file before the command reading it starts, as `cp other.mk Makefile && make test`
+can, is asked about whatever the grants. `airlock grants` lists these files for each grant. What they load in turn
+(a Makefile's `include`, a script another one calls) and code given inline (`bash -c '…'`) are not followed.
 
 A project can also commit `.airlock.yaml`. Like every policy file, it can only refuse:
 

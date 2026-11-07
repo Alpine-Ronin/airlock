@@ -33,7 +33,10 @@ allowed to read back.
    only offers *once* or *refuse*. A grant records the project files that
    decide what its command does (the Makefile, `package.json`, `composer.json`,
    the script run) with a hash of each: an agent can edit them, so once one
-   changes the grant no longer covers the command, and the form says which.
+   changes the grant no longer covers the command, and the form says which. A
+   line that can change one before the command reading it starts (any part
+   before it but a plain `cd`, or its own redirection) is never covered: the
+   hashes are checked before the line runs.
 4. **Run.** In a sandbox: bubblewrap on Linux, `sandbox-exec` on macOS. The
    command can write only to the project, `/tmp` and package caches, and cannot
    read Airlock's own files or the user's keys; with `strict`, it has no network.
