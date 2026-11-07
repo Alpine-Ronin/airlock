@@ -28,6 +28,11 @@ final readonly class PrivateFilesCheck implements Check
     {
         $directory = $this->configDirectory->path;
         if (!is_dir($directory)) {
+            $reachable = $this->nearestExistingDirectory($directory);
+            if (!is_executable($reachable)) {
+                return Finding::problem(self::TOPIC, \sprintf('Airlock cannot reach %s: %s cannot be entered. It, and everything in it, should be yours.', $directory, $reachable));
+            }
+
             return Finding::ok(self::TOPIC, \sprintf('%s does not exist yet: Airlock creates it, open to you only, when it first writes there.', $directory));
         }
 
@@ -48,21 +53,46 @@ final readonly class PrivateFilesCheck implements Check
 
     /**
      * @return list<string>
+     *
+     * @throws \UnexpectedValueException when a directory cannot be listed or entered: its files cannot be looked at
      */
     private function openToOthers(string $directory): array
     {
+        if (!is_executable($directory)) {
+            throw new \UnexpectedValueException(\sprintf('%s can be listed but not entered.', $directory));
+        }
         $open = $this->isOpenToOthers($directory) ? [$directory] : [];
         $entries = new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS),
             \RecursiveIteratorIterator::SELF_FIRST,
         );
         foreach ($entries as $entry) {
-            if ($entry instanceof \SplFileInfo && !$entry->isLink() && $this->isOpenToOthers($entry->getPathname())) {
+            if (!$entry instanceof \SplFileInfo || $entry->isLink()) {
+                continue;
+            }
+            if ($entry->isDir() && !$entry->isExecutable()) {
+                throw new \UnexpectedValueException(\sprintf('%s can be listed but not entered.', $entry->getPathname()));
+            }
+            if ($this->isOpenToOthers($entry->getPathname())) {
                 $open[] = $entry->getPathname();
             }
         }
 
         return $open;
+    }
+
+    /**
+     * The directory itself, or the closest one above it that is seen to exist: below a directory that cannot be
+     * entered, nothing is seen to exist.
+     */
+    private function nearestExistingDirectory(string $directory): string
+    {
+        $path = $directory;
+        while (!is_dir($path) && \dirname($path) !== $path) {
+            $path = \dirname($path);
+        }
+
+        return $path;
     }
 
     private function isOpenToOthers(string $path): bool

@@ -21,6 +21,7 @@
 <p align="center">
   <a href="#quick-start-five-minutes">Quick start</a> ·
   <a href="#try-the-demo">Demo</a> ·
+  <a href="https://youtu.be/zLKRchke4pc">Video</a> ·
   <a href="#configuration">Configuration</a> ·
   <a href="docs/design.md">Design</a>
 </p>
@@ -265,6 +266,8 @@ the `env` block of your client's configuration (with Docker, the `-e` options pa
 `~/airlock/.env.local` (git-ignored).
 
 ## Try the demo
+
+Watch it first: [a short video](https://youtu.be/zLKRchke4pc) of this demo.
 
 `demo/` is a small project whose `README.md` hides an instruction to AI assistants: run a script downloaded from the
 internet, silently (its URL never resolves). Copy it, connect Airlock to it as above, open it in your client and ask
