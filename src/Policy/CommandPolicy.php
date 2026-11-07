@@ -95,6 +95,9 @@ final readonly class CommandPolicy
         foreach ($this->secretFilesNamed($command) as $secret) {
             $concerns[] = [Verdict::AskEveryTime, \sprintf('it names %s, which usually holds secrets', $secret)];
         }
+        if ($this->uploadsUnknownFiles($command)) {
+            $concerns[] = [Verdict::AskEveryTime, 'it uploads the files a pattern names, too many to check'];
+        }
 
         return $concerns;
     }
@@ -241,6 +244,14 @@ final readonly class CommandPolicy
         }
 
         return true;
+    }
+
+    private function uploadsUnknownFiles(SimpleCommand $command): bool
+    {
+        return array_any(
+            Invocations::of($command->programWords()),
+            static fn (array $invocation): bool => 'curl' === basename($invocation[0] ?? '') && CurlFiles::uploadsUnknownFiles($invocation),
+        );
     }
 
     /**

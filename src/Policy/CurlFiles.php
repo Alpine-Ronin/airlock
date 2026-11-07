@@ -18,8 +18,14 @@ final class CurlFiles
 
     private const array FORM = ['-F', '--form'];
 
+    /** Options whose value names the files to upload, as a pattern curl expands: `{a,b}` sets, `[1-9]` ranges. */
+    private const array UPLOAD = ['-T', '--upload-file'];
+
     /** Options whose value is a file curl reads. */
-    private const array FILE = ['-T', '--upload-file', '-K', '--config'];
+    private const array FILE = ['-K', '--config'];
+
+    /** The most file names an upload pattern is expanded to: past it, the files cannot all be checked. */
+    private const int MOST_UPLOADS = 1000;
 
     /** Options whose value is a file when it holds no `=`, a cookie string otherwise. */
     private const array COOKIE = ['-b', '--cookie'];
@@ -52,6 +58,23 @@ final class CurlFiles
         }
 
         return array_values(array_unique(array_filter($files, static fn (string $file): bool => '' !== $file && '-' !== $file)));
+    }
+
+    /**
+     * Whether an upload pattern names more files than can be checked, or is one curl would not read: what it uploads
+     * is then unknown.
+     *
+     * @param list<string> $words a curl invocation, its program first
+     */
+    public static function uploadsUnknownFiles(array $words): bool
+    {
+        foreach (self::options(\array_slice($words, 1)) as [$option, $value]) {
+            if (\in_array($option, self::UPLOAD, true) && null === self::expanded($value)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -123,8 +146,11 @@ final class CurlFiles
         if (\in_array($option, self::FORM, true)) {
             return self::formFiles($value);
         }
+        if (\in_array($option, self::UPLOAD, true)) {
+            return self::expanded($value) ?? [];
+        }
         if (\in_array($option, self::FILE, true)) {
-            return self::globbed($value);
+            return [$value];
         }
         if (\in_array($option, self::COOKIE, true)) {
             return str_contains($value, '=') ? [] : [$value];
@@ -225,16 +251,87 @@ final class CurlFiles
     }
 
     /**
-     * The files an `-T` value names: itself, or each of a `{a,b}` list.
+     * The file names an upload pattern expands to, every `{a,b}` set and `[a-z]`, `[1-9]`, `[01-10:2]` range combined;
+     * null past the most that can be checked, or for a pattern curl would not read.
+     *
+     * @return list<string>|null
+     */
+    private static function expanded(string $pattern): ?array
+    {
+        $names = [''];
+        $length = \strlen($pattern);
+        for ($position = 0; $position < $length; ++$position) {
+            $character = $pattern[$position];
+            $closing = ['{' => '}', '[' => ']'][$character] ?? null;
+            if ('\\' === $character && $position + 1 < $length) {
+                $choices = [$pattern[++$position]];
+            } elseif (null !== $closing) {
+                $end = strpos($pattern, $closing, $position + 1);
+                if (false === $end) {
+                    return null;
+                }
+                $group = substr($pattern, $position + 1, $end - $position - 1);
+                $choices = '{' === $character ? explode(',', $group) : self::range($group);
+                $position = $end;
+            } else {
+                $choices = [$character];
+            }
+            if (null === $choices || \count($names) * \count($choices) > self::MOST_UPLOADS) {
+                return null;
+            }
+            $names = self::combined($names, $choices);
+        }
+
+        return $names;
+    }
+
+    /**
+     * @param list<string>           $names
+     * @param non-empty-list<string> $choices
      *
      * @return list<string>
      */
-    private static function globbed(string $value): array
+    private static function combined(array $names, array $choices): array
     {
-        if (1 !== preg_match('/^(.*)\{([^{}]*)\}(.*)$/', $value, $match)) {
-            return [$value];
+        $combined = [];
+        foreach ($names as $name) {
+            foreach ($choices as $choice) {
+                $combined[] = $name.$choice;
+            }
         }
 
-        return array_map(static fn (string $choice): string => $match[1].$choice.$match[3], explode(',', $match[2]));
+        return $combined;
+    }
+
+    /**
+     * The values of a curl range, `a-z`, `1-9` or `01-10`, with an optional step (`:2`); null when it is not one, or
+     * holds more than can be checked.
+     *
+     * @return non-empty-list<string>|null
+     */
+    private static function range(string $range): ?array
+    {
+        $step = 1;
+        if (1 === preg_match('/^(.+):(\d+)$/', $range, $stepped)) {
+            $range = $stepped[1];
+            $step = (int) $stepped[2];
+        }
+        if ($step < 1) {
+            return null;
+        }
+        if (1 === preg_match('/^([a-zA-Z])-([a-zA-Z])$/', $range, $letters)) {
+            return $letters[1] <= $letters[2] ? array_map(strval(...), range($letters[1], $letters[2], $step)) : null;
+        }
+        if (1 !== preg_match('/^(\d+)-(\d+)$/', $range, $numbers)) {
+            return null;
+        }
+        $first = (int) $numbers[1];
+        $last = (int) $numbers[2];
+        if ($last < $first || intdiv($last - $first, $step) + 1 > self::MOST_UPLOADS) {
+            return null;
+        }
+        $width = str_starts_with($numbers[1], '0') ? \strlen($numbers[1]) : 0;
+
+        return array_map(static fn (int $value): string => str_pad((string) $value, $width, '0', \STR_PAD_LEFT), range($first, $last, $step));
     }
 }
