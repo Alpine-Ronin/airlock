@@ -6,6 +6,7 @@ namespace App\Configuration;
 
 use App\Output\ModelInjectionClassifier;
 use App\Output\NotCheckedReason;
+use App\Output\OutputCheck;
 use App\Output\OutputChunker;
 use App\Output\OutputVerdict;
 use App\Risk\ModelRiskExplainer;
@@ -43,7 +44,7 @@ final readonly class ModelCalibrator
     public function calibrate(string $baseUrl, #[\SensitiveParameter] string $apiKey, string $model): Calibration
     {
         $startedAt = $this->clock->now();
-        $platform = Factory::createPlatform(rtrim($baseUrl, '/'), $apiKey, $this->httpClient, eventDispatcher: $this->eventDispatcher, supportsEmbeddings: false, name: 'calibration');
+        $platform = $this->platform($baseUrl, $apiKey);
         $modelApi = new ModelApi($baseUrl, $apiKey);
         $classifier = new ModelInjectionClassifier($platform, new OutputChunker(), new NullLogger(), $modelApi, $this->retries, $model);
 
@@ -63,6 +64,21 @@ final readonly class ModelCalibrator
         }
 
         return $this->withRiskLine($platform, $modelApi, $model, $startedAt, OutputVerdict::Clean === $harmless->verdict ? null : 'it flagged a harmless output');
+    }
+
+    /**
+     * The verdict of the output check, as the server would give it, on one output.
+     */
+    public function checkOutput(string $baseUrl, #[\SensitiveParameter] string $apiKey, string $model, string $output): OutputCheck
+    {
+        $classifier = new ModelInjectionClassifier($this->platform($baseUrl, $apiKey), new OutputChunker(), new NullLogger(), new ModelApi($baseUrl, $apiKey), $this->retries, $model);
+
+        return $classifier->check($output);
+    }
+
+    private function platform(string $baseUrl, #[\SensitiveParameter] string $apiKey): PlatformInterface
+    {
+        return Factory::createPlatform(rtrim($baseUrl, '/'), $apiKey, $this->httpClient, eventDispatcher: $this->eventDispatcher, supportsEmbeddings: false, name: 'calibration');
     }
 
     private function withRiskLine(PlatformInterface $platform, ModelApi $modelApi, string $model, \DateTimeImmutable $startedAt, ?string $outputCheckFailure): Calibration

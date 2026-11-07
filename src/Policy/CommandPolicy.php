@@ -255,11 +255,20 @@ final readonly class CommandPolicy
 
         $secrets = [];
         foreach ($candidates as $candidate) {
-            // The value of an option or an assignment names a file too: --env-file=.env, FILE=id_rsa.
+            // Each part of an option's or an assignment's value may name a file: --env-file=.env, FILE=id_rsa, and
+            // curl's -F key=@id_rsa;filename=public.txt, key=@a,b or --data-urlencode key@.env, where @ or < sends a
+            // file's content and its name may be quoted (key=@"id_rsa"). The whole word and its value count as well
+            // as each part, as written too: a quote or a comma can be part of a file's name.
             $equals = strrpos($candidate, '=');
-            $path = false === $equals ? $candidate : substr($candidate, $equals + 1);
-            if ($this->secretFiles->isSecret($path)) {
-                $secrets[] = $path;
+            $value = false === $equals ? $candidate : substr($candidate, $equals + 1);
+            $parts = [$candidate, $value, ...explode('=', str_replace([';', ',', '@'], '=', $candidate))];
+            foreach (array_unique($parts) as $part) {
+                $sent = ltrim($part, '@<');
+                foreach (array_unique([$part, $sent, trim($sent, '"\'')]) as $path) {
+                    if ($this->secretFiles->isSecret($path)) {
+                        $secrets[] = $path;
+                    }
+                }
             }
         }
 

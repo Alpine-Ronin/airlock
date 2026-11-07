@@ -5,10 +5,18 @@ minor version may change the configuration and file formats.
 
 ## Unreleased
 
+### Added
+
+- `airlock configure --check --samples <file>` measures the output check on a file of outputs, injected or clean: how
+  many injections it flags, how many clean outputs it flags too. `tests/Fixtures/injection/` holds the public corpora,
+  and the README the results.
+
 ### Changed
 
 - `airlock doctor` warns when commands can reach the network, as they do by default (`AIRLOCK_SANDBOX=auto`): one an
-  injection slipped in can send what the project holds elsewhere. `AIRLOCK_SANDBOX=strict` cuts the network off.
+  injection slipped in can send what the project holds elsewhere. `AIRLOCK_SANDBOX=strict` cuts the network off (#67).
+- A command sending a secret file's content, such as `curl -d @.env …` or `-F key=@id_rsa`, is asked about every time,
+  as one naming the file already was.
 
 - A grant holds only while the project files deciding what its command does are unchanged: the Makefile for `make`,
   `package.json` for npm, pnpm, yarn and bun, `composer.json` for Composer, the script an interpreter or a path runs,
