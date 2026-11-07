@@ -35,8 +35,10 @@ allowed to read back.
    the script run) with a hash of each: an agent can edit them, so once one
    changes the grant no longer covers the command, and the form says which. A
    line that can change one before the command reading it starts (any part
-   before it but a plain `cd`, or its own redirection) is never covered: the
-   hashes are checked before the line runs.
+   before it but a plain `cd`, one running alongside it, or its own
+   redirection) is never covered: the hashes are checked before the line runs.
+   Not followed: what those files load in turn (a Makefile's `include`, a
+   script another one calls) and code given inline (`bash -c '…'`).
 4. **Run.** In a sandbox: bubblewrap on Linux, `sandbox-exec` on macOS. The
    command can write only to the project, `/tmp` and package caches, and cannot
    read Airlock's own files or the user's keys; with `strict`, it has no network.
