@@ -98,6 +98,26 @@ final class GrantsCommandTest extends KernelTestCase
         self::assertStringContainsString('npm run lint …', $tester->getDisplay(), 'What a preset allows is shown before the user agrees.');
     }
 
+    public function testAPresetIsNotAllowedByEnterAlone(): void
+    {
+        $tester = $this->tester();
+
+        $tester->setInputs(['']);
+        $tester->execute(['--preset' => 'php']);
+
+        self::assertSame([], $this->grants()->all());
+        self::assertStringContainsString('Nothing was allowed.', $tester->getDisplay());
+    }
+
+    public function testAPresetIsNotAllowedWithoutInteraction(): void
+    {
+        $tester = $this->tester();
+
+        $tester->execute(['--preset' => 'php'], ['interactive' => false]);
+
+        self::assertSame([], $this->grants()->all(), 'Run from a script, a preset must not allow anything nobody agreed to.');
+    }
+
     public function testAnUnknownPresetIsRefused(): void
     {
         $tester = $this->tester();

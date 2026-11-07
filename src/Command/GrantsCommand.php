@@ -107,7 +107,8 @@ final class GrantsCommand extends Command
         }
         $this->show($io, $numbered);
         $io->text('Each runs in the sandbox, and is asked about again once a file it lists changes. A test runner runs the project\'s own code.');
-        if (!$io->confirm(\sprintf('Allow these commands always in %s?', $this->projectDirectory->path), true)) {
+        // Granting is what a question asked by mistake must not do: only an explicit yes allows, never Enter alone.
+        if (!$io->confirm(\sprintf('Allow these commands always in %s?', $this->projectDirectory->path), false)) {
             $io->text('Nothing was allowed.');
 
             return Command::SUCCESS;
