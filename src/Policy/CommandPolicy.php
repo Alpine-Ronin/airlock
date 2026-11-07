@@ -257,8 +257,12 @@ final readonly class CommandPolicy
         foreach ($candidates as $candidate) {
             // Each part of an option's or an assignment's value may name a file: --env-file=.env, FILE=id_rsa, and
             // curl's -F key=@id_rsa;filename=public.txt or key=@a,b, where @ or < sends a file's content and its name
-            // may be quoted (key=@"id_rsa"). Each part is read as written too: a quote can be part of a file's name.
-            foreach (explode('=', str_replace([';', ','], '=', $candidate)) as $part) {
+            // may be quoted (key=@"id_rsa"). The whole word and its value count as well as each part, as written too:
+            // a quote or a comma can be part of a file's name.
+            $equals = strrpos($candidate, '=');
+            $value = false === $equals ? $candidate : substr($candidate, $equals + 1);
+            $parts = [$candidate, $value, ...explode('=', str_replace([';', ','], '=', $candidate))];
+            foreach (array_unique($parts) as $part) {
                 $sent = ltrim($part, '@<');
                 foreach (array_unique([$part, $sent, trim($sent, '"\'')]) as $path) {
                     if ($this->secretFiles->isSecret($path)) {
