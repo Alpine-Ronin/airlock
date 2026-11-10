@@ -26,17 +26,15 @@ final readonly class RunningProxy
     }
 
     /**
-     * Stops the proxy and removes its directory.
-     *
-     * @return list<string> the hosts it blocked, as host:port, each once, in the order they were tried
+     * Stops the proxy, removes its directory, and says which hosts it blocked.
      */
-    public function stop(): array
+    public function stop(): BlockedConnections
     {
         $this->process->stop(self::STOP_SECONDS, \SIGTERM);
         $blocked = $this->blocked();
         $this->filesystem->remove($this->directory);
 
-        return $blocked;
+        return BlockedConnections::of($blocked);
     }
 
     /**

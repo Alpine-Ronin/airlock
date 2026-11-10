@@ -163,11 +163,12 @@ final readonly class RunCommandTool
      */
     private function checkedText(CommandResult $result): string
     {
-        if ([] === $result->blockedConnections) {
+        $blocked = $result->blockedConnections();
+        if ($blocked->isEmpty()) {
             return $result->output;
         }
 
-        return $result->output."\n".implode("\n", $result->blockedConnections);
+        return $result->output."\n".implode("\n", $blocked->named);
     }
 
     private function audit(string $command, Assessment $assessment, Outcome $outcome, ?CommandResult $result = null, ?string $detail = null, ?OutputCheck $check = null): void
@@ -184,7 +185,8 @@ final readonly class RunCommandTool
             $detail,
             $check,
             $result?->maskedSecrets,
-            $result->blockedConnections ?? [],
+            $result?->blockedConnections()->named ?? [],
+            $result?->blockedConnections()->count ?? 0,
         ));
     }
 }

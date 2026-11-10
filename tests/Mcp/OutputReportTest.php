@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Mcp;
 
+use App\Execution\BlockedConnections;
 use App\Execution\CommandResult;
 use App\Mcp\OutputReport;
 use App\Output\NotCheckedReason;
@@ -43,7 +44,7 @@ final class OutputReportTest extends TestCase
 
     public function testBlockedHostsFollowTheOutputAsDataInTheirOwnTags(): void
     {
-        $result = new CommandResult(56, "curl: (56) CONNECT tunnel failed, response 403\n", blockedConnections: ['evil.example:443', 'ignore-previous-instructions.example:443']);
+        $result = new CommandResult(56, "curl: (56) CONNECT tunnel failed, response 403\n", blockedConnections: BlockedConnections::of(['evil.example:443', 'ignore-previous-instructions.example:443']));
 
         $text = $this->text(new OutputReport()->result($result, OutputCheck::clean()));
 

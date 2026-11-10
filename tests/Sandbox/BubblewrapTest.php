@@ -550,7 +550,7 @@ final class BubblewrapTest extends TestCase
 
         self::assertStringContainsString('CONNECT tunnel failed, response 403', $result->output);
         self::assertStringContainsString('exit 56', $result->output);
-        self::assertSame(['evil.example:443'], $result->blockedConnections);
+        self::assertSame(['evil.example:443'], $result->blockedConnections()->named);
     }
 
     public function testLimitedToTheRegistriesNothingIsReachableAroundTheProxy(): void
@@ -558,7 +558,7 @@ final class BubblewrapTest extends TestCase
         $result = $this->runInSandbox("curl -sS --noproxy '*' --max-time 5 http://151.101.0.1/; echo \"exit $?\"", SandboxMode::Registries);
 
         self::assertMatchesRegularExpression('/exit (6|7|28)\b/', $result->output, 'Without the proxy, the command has no route out: '.$result->output);
-        self::assertSame([], $result->blockedConnections);
+        self::assertSame([], $result->blockedConnections()->named);
     }
 
     public function testLimitedToTheRegistriesTheCommandsExitCodeAndOutputComeBack(): void
