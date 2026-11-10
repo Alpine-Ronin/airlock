@@ -142,6 +142,17 @@ jobs:
             - name: Run one command through the binary, as a client would
               run: cd "$(mktemp -d)" && python3 "$GITHUB_WORKSPACE/.github/scripts/smoke.py" -- "$GITHUB_WORKSPACE/airlock-${{ matrix.target }}" mcp:server
 
+            # Limited to the registries, the relay (Linux) or the profile (macOS) sends a command through the proxy alone.
+            - name: Reach a registry and nothing else
+              env:
+                  AIRLOCK_SANDBOX: registries
+              run: >-
+                  cd "$(mktemp -d)" && python3 "$GITHUB_WORKSPACE/.github/scripts/smoke.py"
+                  --command "curl -sS -o /dev/null -w '%{http_code}\n' https://repo.packagist.org/packages.json && ! curl -sS -o /dev/null https://example.com/ 2>/dev/null"
+                  --output 200
+                  --expect "blocked its connections to example.com:443"
+                  -- "$GITHUB_WORKSPACE/airlock-${{ matrix.target }}" mcp:server
+
             # The environment wins over the configuration packed in the binary: an API set there is called (and refused).
             - name: Read the model API from the environment
               env:
