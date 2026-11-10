@@ -5,15 +5,21 @@ declare(strict_types=1);
 namespace App\Tests\Sandbox;
 
 use App\Configuration\ConfigDirectory;
+use App\Connect\AirlockExecutable;
 use App\Execution\CommandResult;
 use App\Execution\CommandRunner;
 use App\Execution\ProjectDirectory;
+use App\Execution\RegistriesProxy;
+use App\Network\NetworkFiles;
+use App\Network\Streams;
 use App\Output\SecretMasker;
+use App\Policy\PolicyFiles;
 use App\Sandbox\Bubblewrap;
 use App\Sandbox\ReplaceableGitLinkException;
 use App\Sandbox\SandboxDetector;
 use App\Sandbox\SandboxMode;
 use App\Sandbox\SandboxPaths;
+use App\Shell\ShellParser;
 use PHPUnit\Framework\Attributes\RequiresOperatingSystemFamily;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
@@ -579,11 +585,57 @@ final class BubblewrapTest extends TestCase
         self::assertFileDoesNotExist($this->root.'/project/late', 'The command kept running after Airlock said it was stopped.');
     }
 
+    public function testLimitedToTheRegistriesALocalPortTheUserOpenedIsReachableAndNoOther(): void
+    {
+        $opened = $this->freePort();
+        do {
+            $closed = $this->freePort();
+        } while ($closed === $opened);
+        $server = new Process([\PHP_BINARY, '-S', '127.0.0.1:'.$opened, '-t', $this->root.'/outside']);
+        $server->start();
+        $server->waitUntil(static fn (string $type, string $output): bool => str_contains($output, 'started'));
+        $this->filesystem->dumpFile($this->root.'/home/.config/airlock/network.yaml', "local: [{$opened}]\n");
+        try {
+            $result = $this->runInSandbox(\sprintf(
+                'curl -sS -o /dev/null -w "%%{http_code}\n" http://127.0.0.1:%d/missing; curl -sS --max-time 5 http://127.0.0.1:%d/ >/dev/null 2>&1; echo "closed $?"',
+                $opened,
+                $closed,
+            ), SandboxMode::Registries);
+        } finally {
+            $server->stop(0);
+        }
+
+        self::assertSame("404\nclosed 7\n", $result->output);
+    }
+
+    public function testLimitedToTheRegistriesACommittedPolicyTakesARegistryAway(): void
+    {
+        $this->filesystem->dumpFile($this->root.'/project/.airlock.yaml', "refuse_hosts:\n  - repo.packagist.org\n");
+
+        $result = $this->runInSandbox('curl -sS --max-time 10 https://repo.packagist.org/packages.json', SandboxMode::Registries);
+
+        self::assertStringContainsString('CONNECT tunnel failed, response 403', $result->output);
+        self::assertSame(['repo.packagist.org:443'], $result->blockedConnections()->named);
+    }
+
     public function testLimitedToTheRegistriesACommandsOwnLocalServerStaysReachable(): void
     {
         $result = $this->runInSandbox('php -S 127.0.0.1:8099 -t . >/dev/null 2>&1 & sleep 0.5; curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:8099/missing; kill %1', SandboxMode::Registries);
 
         self::assertSame('404', trim($result->output));
+    }
+
+    /**
+     * @return int<1, 65535>
+     */
+    private function freePort(): int
+    {
+        $socket = Streams::server('tcp://127.0.0.1:0');
+        $port = (int) substr((string) stream_socket_get_name($socket, false), \strlen('127.0.0.1:'));
+        fclose($socket);
+        self::assertGreaterThan(0, $port);
+
+        return max(1, min(65535, $port));
     }
 
     private function runInSandbox(string $commandLine, SandboxMode $mode = SandboxMode::Auto, int $timeoutSeconds = 30, ?string $project = null, ?string $sshAgentSocket = null): CommandResult
@@ -593,7 +645,12 @@ final class BubblewrapTest extends TestCase
 
     private function runner(SandboxMode $mode, int $timeoutSeconds, ?string $project, ?string $sshAgentSocket): CommandRunner
     {
-        return new CommandRunner($this->detector($mode), new ProjectDirectory($project ?? $this->root.'/project'), new SecretMasker(), $timeoutSeconds, $sshAgentSocket);
+        $projectDirectory = new ProjectDirectory($project ?? $this->root.'/project');
+        $configDirectory = new ConfigDirectory($this->root.'/home');
+        $networkFiles = new NetworkFiles($configDirectory, $projectDirectory, new PolicyFiles($configDirectory, $projectDirectory, new ShellParser()));
+        $registriesProxy = new RegistriesProxy(new AirlockExecutable(\dirname(__DIR__, 2)));
+
+        return new CommandRunner($this->detector($mode), $projectDirectory, new SecretMasker(), $registriesProxy, $networkFiles, $timeoutSeconds, $sshAgentSocket);
     }
 
     private function detector(SandboxMode $mode): SandboxDetector

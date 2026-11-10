@@ -148,6 +148,17 @@ final class SandboxExecTest extends TestCase
         self::assertSame('true', $command[\count($command) - 1]);
     }
 
+    public function testLimitedToTheRegistriesTheLocalPortsTheUserOpenedAreReachable(): void
+    {
+        $proxy = ProxyEndpoint::fromAnnounced('127.0.0.1:41234')->withLocalPorts([5432, 6379]);
+
+        $profile = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), network: NetworkAccess::Registries)
+            ->confine(['true'], '/p', registriesProxy: $proxy)[2];
+
+        self::assertStringContainsString('(allow network-outbound (remote ip "localhost:5432"))', $profile);
+        self::assertStringContainsString('(allow network-outbound (remote ip "localhost:6379"))', $profile);
+    }
+
     public function testLimitedToTheRegistriesACommandWithoutAProxyReachesAnyHost(): void
     {
         $command = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), network: NetworkAccess::Registries)->confine(['true'], '/p');

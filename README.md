@@ -357,8 +357,10 @@ Airlock's own files live in `~/.config/airlock/` (or `$XDG_CONFIG_HOME/airlock/`
 | File | What it holds |
 |---|---|
 | `models.yaml` | What `airlock configure` set up: the model API, its key, the models |
-| `policy.yaml` | Commands you refuse everywhere |
-| `projects/<name>-<hash>/policy.yaml` | Commands you refuse in one project |
+| `policy.yaml` | Commands and hosts you refuse everywhere |
+| `projects/<name>-<hash>/policy.yaml` | Commands and hosts you refuse in one project |
+| `network.yaml` | With `AIRLOCK_SANDBOX=registries`, hosts and local ports commands may reach besides the package registries, everywhere |
+| `projects/<name>-<hash>/network.yaml` | The same, in one project |
 | `projects/<name>-<hash>/grants.yaml` | What *always for this project* allowed, with the files each grant needs unchanged |
 | `audit.jsonl` | Every decision, one JSON object per line. At 10 MiB, about 20,000 decisions, it moves to `audit.1.jsonl`, the one before to `audit.2.jsonl`, and so on up to `audit.5.jsonl`: the oldest goes |
 
@@ -387,7 +389,26 @@ A project can also commit `.airlock.yaml`. Like every policy file, it can only r
 refuse:
   - 'terraform destroy'
   - 'make deploy'
+refuse_hosts:
+  - api.github.com   # never reached from the sandbox, on any port, even though Composer uses it
 ```
+
+With `AIRLOCK_SANDBOX=registries`, a command reaches the package registries (Packagist, npm, PyPI, crates.io, Go,
+RubyGems, and GitHub's downloads) and nothing else. `network.yaml`, yours alone, adds to that:
+
+```yaml
+allow:
+  - mirror.example.com        # port 443
+  - repo.example.com:8443
+local:
+  - 5432                      # a database on this machine the tests use
+```
+
+A host is named exactly: no wildcard, since a wildcard on a domain hosting users' content is an upload service. A
+committed `.airlock.yaml` cannot add a host, as the agent and the repository's author can both write it. Note that
+`api.github.com`, on the list because Composer downloads most packages through it, also takes writes from anyone with
+a token: a command carrying an attacker's token could create a gist there. `refuse_hosts` takes it away if your
+project does not need it. See [docs/network.md](docs/network.md).
 
 ## Troubleshooting
 

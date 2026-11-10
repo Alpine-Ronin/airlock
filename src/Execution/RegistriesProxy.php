@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Execution;
 
 use App\Connect\AirlockExecutable;
+use App\Network\NetworkSettings;
 use App\Network\ProxyEndpoint;
 use App\Sandbox\Sandbox;
 use Symfony\Component\Filesystem\Filesystem;
@@ -28,19 +29,28 @@ final readonly class RegistriesProxy
     /**
      * @throws RegistriesProxyUnavailableException
      */
-    public function start(Sandbox $sandbox): RunningProxy
+    public function start(Sandbox $sandbox, NetworkSettings $settings): RunningProxy
     {
         $directory = \sprintf('%s/airlock-proxy-%s', rtrim(sys_get_temp_dir(), '/'), bin2hex(random_bytes(8)));
         $this->filesystem->mkdir($directory, 0o700);
         $log = $directory.'/decisions.jsonl';
         $listen = $sandbox->proxyListenAddress($directory);
-        $process = new Process($this->airlockExecutable->commandLine('network-proxy', '--listen', $listen->option, '--log', $log), timeout: self::START_SECONDS);
+        $arguments = ['network-proxy', '--listen', $listen->option, '--log', $log];
+        foreach ($settings->allowedHosts->authorities() as $authority) {
+            $arguments[] = '--allow';
+            $arguments[] = $authority;
+        }
+        foreach ($settings->localPorts as $port) {
+            $arguments[] = '--local-port';
+            $arguments[] = (string) $port;
+        }
+        $process = new Process($this->airlockExecutable->commandLine(...$arguments), timeout: self::START_SECONDS);
         try {
             $process->start();
             $process->waitUntil(static fn (string $type, string $output): bool => Process::OUT === $type && str_contains($output, "\n"));
             // Started, it serves as long as the command runs: the command's own time limit applies.
             $process->setTimeout(null);
-            $endpoint = ProxyEndpoint::fromAnnounced(trim(explode("\n", $process->getOutput(), 2)[0]));
+            $endpoint = ProxyEndpoint::fromAnnounced(trim(explode("\n", $process->getOutput(), 2)[0]))->withLocalPorts($settings->localPorts);
         } catch (ProcessException|\InvalidArgumentException $e) {
             $process->stop(0);
             $this->filesystem->remove($directory);

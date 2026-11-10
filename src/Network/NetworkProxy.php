@@ -16,12 +16,14 @@ final readonly class NetworkProxy
     }
 
     /**
+     * @param list<int> $localPorts the ports on 127.0.0.1 a command may reach, as `localhost`
+     *
      * @throws NetworkStreamException
      */
-    public function listen(ListenAddress $address, AllowedHosts $allowedHosts, DecisionLog $decisionLog): ProxyServer
+    public function listen(ListenAddress $address, AllowedHosts $allowedHosts, DecisionLog $decisionLog, array $localPorts = []): ProxyServer
     {
         $listener = Streams::server($address->streamAddress);
 
-        return new ProxyServer($listener, $address, new ProxyGate($allowedHosts, $this->resolver, $this->dialer, $decisionLog));
+        return new ProxyServer($listener, $address, new ProxyGate($allowedHosts, $this->resolver, $this->dialer, $decisionLog, $localPorts));
     }
 }

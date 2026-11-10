@@ -7,6 +7,7 @@ namespace App\Command;
 use App\Network\AllowedHosts;
 use App\Network\JsonLinesDecisionLog;
 use App\Network\ListenAddress;
+use App\Network\MalformedProxyRequestException;
 use App\Network\NetworkProxy;
 use App\Network\NetworkStreamException;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -18,8 +19,8 @@ use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * The proxy to the package registries, served until it is stopped. Airlock starts it for a sandboxed command and
- * stops it after: it prints where it listens, then one JSON line per decision goes to the log file.
+ * The proxy to the hosts a sandboxed command may reach, served until it is stopped. Airlock starts it for a command,
+ * naming each host, and stops it after: it prints where it listens, then one JSON line per decision goes to the log.
  */
 #[AsCommand(name: 'network-proxy', description: 'Serve the proxy that lets a sandboxed command reach the package registries only, until stopped')]
 final class NetworkProxyCommand extends Command implements SignalableCommandInterface
@@ -56,7 +57,9 @@ final class NetworkProxyCommand extends Command implements SignalableCommandInte
     {
         $this
             ->addOption('listen', null, InputOption::VALUE_REQUIRED, 'unix:///absolute/path, or 127.0.0.1:<port> (0 for any free port)')
-            ->addOption('log', null, InputOption::VALUE_REQUIRED, 'The file each decision is appended to, as a JSON line');
+            ->addOption('log', null, InputOption::VALUE_REQUIRED, 'The file each decision is appended to, as a JSON line')
+            ->addOption('allow', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'A host the command may reach, as host:port; none by default')
+            ->addOption('local-port', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'A port on 127.0.0.1 the command may reach as localhost');
     }
 
     #[\Override]
@@ -78,7 +81,20 @@ final class NetworkProxyCommand extends Command implements SignalableCommandInte
             return Command::INVALID;
         }
         try {
-            $server = $this->networkProxy->listen($address, AllowedHosts::registries(), new JsonLinesDecisionLog($log));
+            $allowedHosts = AllowedHosts::fromAuthorities($this->strings($input->getOption('allow')));
+        } catch (MalformedProxyRequestException $e) {
+            $errors->writeln('--allow: '.$e->getMessage());
+
+            return Command::INVALID;
+        }
+        $localPorts = $this->ports($this->strings($input->getOption('local-port')));
+        if (null === $localPorts) {
+            $errors->writeln('--local-port takes a port number.');
+
+            return Command::INVALID;
+        }
+        try {
+            $server = $this->networkProxy->listen($address, $allowedHosts, new JsonLinesDecisionLog($log), $localPorts);
         } catch (NetworkStreamException $e) {
             $errors->writeln($e->getMessage());
 
@@ -91,5 +107,40 @@ final class NetworkProxyCommand extends Command implements SignalableCommandInte
         $server->close();
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function strings(mixed $option): array
+    {
+        $strings = [];
+        foreach (\is_array($option) ? $option : [] as $value) {
+            if (\is_string($value)) {
+                $strings[] = $value;
+            }
+        }
+
+        return $strings;
+    }
+
+    /**
+     * The ports, or null when one is not a port.
+     *
+     * @param list<string> $values
+     *
+     * @return list<int>|null
+     */
+    private function ports(array $values): ?array
+    {
+        $ports = [];
+        foreach ($values as $value) {
+            if (1 !== preg_match('/^[1-9][0-9]{0,4}$/', $value) || (int) $value > 65535) {
+                return null;
+            }
+            $ports[] = (int) $value;
+        }
+
+        return $ports;
     }
 }

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Execution;
 
-use App\Connect\AirlockExecutable;
+use App\Network\InvalidNetworkFileException;
+use App\Network\NetworkFiles;
 use App\Network\ProxyEndpoint;
 use App\Output\SecretMasker;
+use App\Policy\InvalidPolicyException;
 use App\Sandbox\NetworkAccess;
 use App\Sandbox\SandboxDetector;
 use App\Sandbox\SshAgent;
@@ -39,16 +41,19 @@ final readonly class CommandRunner
         private SandboxDetector $sandboxDetector,
         private ProjectDirectory $projectDirectory,
         private SecretMasker $secretMasker,
+        private RegistriesProxy $registriesProxy,
+        private NetworkFiles $networkFiles,
         #[Autowire(env: 'int:AIRLOCK_TIMEOUT')]
         private int $timeoutSeconds,
         #[Autowire(env: 'default::SSH_AUTH_SOCK')]
         private ?string $sshAgentSocket = null,
-        private RegistriesProxy $registriesProxy = new RegistriesProxy(new AirlockExecutable(__DIR__.'/../..')),
     ) {
     }
 
     /**
      * @throws RegistriesProxyUnavailableException when the network is limited to the registries and no proxy starts
+     * @throws InvalidNetworkFileException         when a network file cannot be read
+     * @throws InvalidPolicyException              when a policy file cannot be read
      */
     public function run(string $commandLine): CommandResult
     {
@@ -56,7 +61,7 @@ final readonly class CommandRunner
         if (NetworkAccess::Registries !== $sandbox->network()) {
             return $this->runConfined($commandLine, null, null);
         }
-        $proxy = $this->registriesProxy->start($sandbox);
+        $proxy = $this->registriesProxy->start($sandbox, $this->networkFiles->settings());
         try {
             $result = $this->runConfined($commandLine, null, $proxy->endpoint);
         } finally {

@@ -132,12 +132,31 @@ final class ProxyGateTest extends TestCase
         self::assertSame(['rubygems.org:443 unreachable'], $this->decisions->lines);
     }
 
+    public function testLocalhostOnALocalPortTheUserOpenedIsThisMachine(): void
+    {
+        $dialer = $this->dialer();
+        $gate = $this->gate([], $dialer, localPorts: [5432]);
+
+        $gate->open($this->target('localhost:5432'));
+
+        self::assertSame(['127.0.0.1:5432'], $dialer->dialed);
+        self::assertSame(['localhost:5432 allowed'], $this->decisions->lines);
+    }
+
+    public function testLocalhostOnAnotherPortIsRefused(): void
+    {
+        $gate = $this->gate(['localhost' => ['127.0.0.1']], $this->dialer(), localPorts: [5432]);
+
+        self::assertSame(ProxyDecision::NotListed, $this->refusal($gate, 'localhost:6379')->decision);
+    }
+
     /**
      * @param array<string, list<string>> $addressesByHost
+     * @param list<int>                   $localPorts
      */
-    private function gate(array $addressesByHost, LocalDialer $dialer): ProxyGate
+    private function gate(array $addressesByHost, LocalDialer $dialer, array $localPorts = []): ProxyGate
     {
-        return new ProxyGate(AllowedHosts::registries(), new FixedResolver($addressesByHost), $dialer, $this->decisions);
+        return new ProxyGate(AllowedHosts::registries(), new FixedResolver($addressesByHost), $dialer, $this->decisions, $localPorts);
     }
 
     /**
