@@ -87,6 +87,9 @@ final readonly class Bubblewrap implements Sandbox
             $arguments[] = '--unshare-net';
         }
         if ($isThroughProxy) {
+            // The relay stands between bubblewrap and the command: its own PID namespace dies with bubblewrap, so a
+            // command stopped past its time limit takes its processes with it.
+            $arguments[] = '--unshare-pid';
             array_push($arguments, ...$this->proxyRoute($registriesProxy));
             $command = [...$this->airlockCommand, 'network-relay', self::PROXY_SOCKET, (string) self::RELAY_PORT, '--', ...$command];
         }

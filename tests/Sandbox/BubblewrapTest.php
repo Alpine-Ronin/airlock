@@ -569,6 +569,16 @@ final class BubblewrapTest extends TestCase
         self::assertStringContainsString("proxy: http://127.0.0.1:3128\nout\nerr\n", $result->output);
     }
 
+    public function testLimitedToTheRegistriesACommandPastItsTimeLimitStopsWithItsProcesses(): void
+    {
+        $result = $this->runInSandbox('(sleep 2; touch late) & echo started; sleep 10', SandboxMode::Registries, timeoutSeconds: 1);
+        sleep(3);
+
+        self::assertTrue($result->hasTimedOut);
+        self::assertSame("started\n", $result->output);
+        self::assertFileDoesNotExist($this->root.'/project/late', 'The command kept running after Airlock said it was stopped.');
+    }
+
     public function testLimitedToTheRegistriesACommandsOwnLocalServerStaysReachable(): void
     {
         $result = $this->runInSandbox('php -S 127.0.0.1:8099 -t . >/dev/null 2>&1 & sleep 0.5; curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:8099/missing; kill %1', SandboxMode::Registries);
