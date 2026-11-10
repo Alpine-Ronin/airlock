@@ -117,7 +117,7 @@ final class NetworkFilesTest extends TestCase
         $this->filesystem->dumpFile($this->project.'/.airlock.yaml', "refuse_hosts: [api.github.com]\nrefuse_hosts: [pypi.org]\n");
 
         $this->expectException(InvalidPolicyException::class);
-        $this->expectExceptionMessage('Duplicate key');
+        $this->expectExceptionMessageIsOrContains('Duplicate key');
 
         $this->settings();
     }
