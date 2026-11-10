@@ -13,7 +13,7 @@ final class NetworkDescription
     {
         return match ($network) {
             NetworkAccess::Open => '',
-            NetworkAccess::Registries => '; on the network, the package registries only',
+            NetworkAccess::Registries => '; on the network, the package registries and the hosts network.yaml allows',
             NetworkAccess::None => '; no network',
         };
     }

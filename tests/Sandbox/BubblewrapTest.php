@@ -450,11 +450,18 @@ final class BubblewrapTest extends TestCase
         self::assertSame("lo\n", $result->output);
     }
 
-    public function testAutoModeKeepsTheNetwork(): void
+    public function testOpenModeKeepsTheNetwork(): void
     {
-        $result = $this->runInSandbox("tail -n +3 /proc/net/dev | cut -d: -f1 | tr -d ' '");
+        $result = $this->runInSandbox("tail -n +3 /proc/net/dev | cut -d: -f1 | tr -d ' '", SandboxMode::Open);
 
         self::assertNotSame("lo\n", $result->output);
+    }
+
+    public function testAutoModeReachesTheNetworkThroughTheProxyAlone(): void
+    {
+        $result = $this->runInSandbox("tail -n +3 /proc/net/dev | cut -d: -f1 | tr -d ' '; ".'echo "$HTTPS_PROXY"');
+
+        self::assertSame("lo\nhttp://127.0.0.1:3128\n", $result->output);
     }
 
     public function testACommandDoesNotSeeAirlocksOwnEnvironment(): void

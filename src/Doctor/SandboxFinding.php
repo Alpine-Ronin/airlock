@@ -23,7 +23,7 @@ final class SandboxFinding
             return Finding::warning(self::TOPIC, \sprintf('None: %s. A command would run with all your permissions, so Airlock asks before every one.', rtrim($sandbox->reason, '.')));
         }
         if (NetworkAccess::Open === $sandbox->network()) {
-            return Finding::warning(self::TOPIC, $sandbox->describe().' Commands can reach the network: one an injection slipped in can send what the project holds elsewhere. AIRLOCK_SANDBOX=registries keeps it to the package registries; AIRLOCK_SANDBOX=strict cuts it off, for downloads and package installs too.');
+            return Finding::warning(self::TOPIC, $sandbox->describe().' Commands can reach any host (AIRLOCK_SANDBOX=open): one an injection slipped in can send what the project holds elsewhere. AIRLOCK_SANDBOX=auto keeps them to the package registries and the hosts network.yaml allows; AIRLOCK_SANDBOX=strict cuts the network off.');
         }
 
         return Finding::ok(self::TOPIC, $sandbox->describe());
