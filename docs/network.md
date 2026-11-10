@@ -1,6 +1,6 @@
 # Airlock: registries-only network
 
-Status: agreed. Steps 1 to 3 are built: `AIRLOCK_SANDBOX=registries` is opt-in.
+Status: built. `auto` limits the network to the registries since 0.6.0.
 
 ## The problem
 

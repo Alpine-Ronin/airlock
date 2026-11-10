@@ -41,7 +41,9 @@ allowed to read back.
    script another one calls) and code given inline (`bash -c '…'`).
 4. **Run.** In a sandbox: bubblewrap on Linux, `sandbox-exec` on macOS. The
    command can write only to the project, `/tmp` and package caches, and cannot
-   read Airlock's own files or the user's keys; with `strict`, it has no network.
+   read Airlock's own files or the user's keys. On the network it reaches the
+   package registries alone, through a proxy Airlock starts for it
+   ([network.md](network.md)); with `strict`, it has no network.
    Where no sandbox can run, Airlock says so, and asks about every command.
 5. **Checked.** Its output goes back to the agent marked as data, not
    instructions, between tags it cannot close, with API keys masked. A model
