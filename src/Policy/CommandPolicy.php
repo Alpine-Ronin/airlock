@@ -63,7 +63,7 @@ final readonly class CommandPolicy
             }
             $reachesARemote = $this->reachesARemote($command->programWords());
             $needsSshAgent = $needsSshAgent || $reachesARemote;
-            $hasOtherParts = $hasOtherParts || (!$reachesARemote && !$this->isPlainCd($command->programWords()));
+            $hasOtherParts = $hasOtherParts || (!$reachesARemote && !$this->isPlainCd($command));
             $isDownloadPiped = $isDownloadPiped || \in_array(basename($command->programWords()[0] ?? ''), self::DOWNLOADERS, true);
         }
 
@@ -76,11 +76,11 @@ final readonly class CommandPolicy
     }
 
     /**
-     * @param list<string> $words
+     * A `cd` with no redirection, as the grants read one: `cd . > /dev/tcp/host/port` is no plain `cd`.
      */
-    private function isPlainCd(array $words): bool
+    private function isPlainCd(SimpleCommand $command): bool
     {
-        return 'cd' === ($words[0] ?? null);
+        return 'cd' === ($command->programWords()[0] ?? null) && [] === $command->redirections;
     }
 
     /**
