@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace App\Sandbox;
 
+use App\Network\ListenAddress;
+use App\Network\ProxyEndpoint;
+
 /**
  * macOS: a Seatbelt profile that allows everything but writing outside the writable paths, reading what must stay
- * unread and, when the network is cut, any network but local sockets.
+ * unread and, when the network is cut, any network but local sockets; limited to the registries, any but the proxy's
+ * port too.
  */
 final readonly class SandboxExec implements Sandbox
 {
@@ -17,12 +21,12 @@ final readonly class SandboxExec implements Sandbox
 
     public function __construct(
         private SandboxPaths $paths,
-        private bool $cutsNetwork,
+        private NetworkAccess $network,
     ) {
     }
 
     #[\Override]
-    public function confine(array $command, string $projectDirectory, ?SshAgent $sshAgent = null): array
+    public function confine(array $command, string $projectDirectory, ?SshAgent $sshAgent = null, ?ProxyEndpoint $registriesProxy = null): array
     {
         $unset = [];
         foreach (self::AGENT_VARIABLES as $variable) {
@@ -32,13 +36,33 @@ final readonly class SandboxExec implements Sandbox
             }
         }
 
-        return ['sandbox-exec', '-p', $this->profile($projectDirectory, $sshAgent instanceof SshAgent), 'env', ...$unset, ...$command];
+        $proxyPort = $this->proxyPort($registriesProxy);
+        $variables = [];
+        if (null !== $proxyPort) {
+            foreach (ProxyEndpoint::variablesFor($proxyPort) as $name => $value) {
+                $variables[] = $name.'='.$value;
+            }
+        }
+
+        return ['sandbox-exec', '-p', $this->profile($projectDirectory, $sshAgent instanceof SshAgent, $proxyPort), 'env', ...$unset, ...$variables, ...$command];
+    }
+
+    #[\Override]
+    public function network(): NetworkAccess
+    {
+        return $this->network;
     }
 
     #[\Override]
     public function cutsNetwork(): bool
     {
-        return $this->cutsNetwork;
+        return NetworkAccess::None === $this->network;
+    }
+
+    #[\Override]
+    public function proxyListenAddress(string $privateDirectory): ListenAddress
+    {
+        return ListenAddress::fromOption('127.0.0.1:0');
     }
 
     #[\Override]
@@ -46,11 +70,11 @@ final readonly class SandboxExec implements Sandbox
     {
         return \sprintf(
             'Sandbox (sandbox-exec): writes only to the project, /tmp and package caches; your keys are out of reach%s.',
-            $this->cutsNetwork ? '; no network' : '',
+            NetworkDescription::of($this->network),
         );
     }
 
-    private function profile(string $projectDirectory, bool $showsKnownHosts): string
+    private function profile(string $projectDirectory, bool $showsKnownHosts, ?int $proxyPort): string
     {
         $temporary = [...$this->paths->private(), ...self::SYSTEM_WRITABLE];
         $writable = array_map(
@@ -73,12 +97,30 @@ final readonly class SandboxExec implements Sandbox
         if (null !== $knownHosts) {
             $rules[] = \sprintf('(allow file-read* (literal %s))', $this->quote($knownHosts));
         }
-        if ($this->cutsNetwork) {
+        if (NetworkAccess::None === $this->network || null !== $proxyPort) {
             $rules[] = '(deny network*)';
             $rules[] = '(allow network* (local unix))';
         }
+        if (null !== $proxyPort) {
+            $rules[] = \sprintf('(allow network-outbound (remote ip "localhost:%d"))', $proxyPort);
+        }
 
         return implode("\n", $rules)."\n";
+    }
+
+    /**
+     * The port the command reaches the registries through, or null when its network is not limited to them.
+     */
+    private function proxyPort(?ProxyEndpoint $registriesProxy): ?int
+    {
+        if (NetworkAccess::Registries !== $this->network || !$registriesProxy instanceof ProxyEndpoint) {
+            return null;
+        }
+        if (null === $registriesProxy->port) {
+            throw new \LogicException('sandbox-exec reaches the registries proxy through a port on 127.0.0.1, and it announced none.');
+        }
+
+        return $registriesProxy->port;
     }
 
     private function quote(string $path): string

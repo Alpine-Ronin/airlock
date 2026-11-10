@@ -83,7 +83,7 @@ final class RecordedModelApi
         }
         $content = RecordedResponses::at($request, 'messages', 1, 'content');
         $content = \is_string($content) ? $content : '';
-        $seesInjection = self::BLIND !== $model && 1 === preg_match('/AI (coding )?(assistants|agents)|ignore (all )?previous instructions/i', $content);
+        $seesInjection = self::BLIND !== $model && 1 === preg_match('/AI[ -](coding[ -])?(assistants|agents)|ignore[ -](all[ -])?previous[ -]instructions/i', $content);
 
         return match ($schema) {
             'InjectionVerdict' => RecordedResponses::fixture($seesInjection ? 'output-check-injection' : 'output-check-clean'),

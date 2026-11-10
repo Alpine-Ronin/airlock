@@ -17,6 +17,21 @@ final readonly class AirlockExecutable
     ) {
     }
 
+    /**
+     * The command line that runs one of Airlock's commands.
+     *
+     * @return non-empty-list<string>
+     */
+    public function commandLine(string ...$arguments): array
+    {
+        $archive = \extension_loaded('phar') ? \Phar::running(false) : '';
+        if ('' !== $archive) {
+            return [$archive, ...array_values($arguments)];
+        }
+
+        return [\PHP_BINARY, $this->projectDirectory.'/bin/console', ...array_values($arguments)];
+    }
+
     public function serverCommand(): ServerCommand
     {
         $archive = \extension_loaded('phar') ? \Phar::running(false) : '';

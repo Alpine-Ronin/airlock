@@ -10,6 +10,7 @@ use App\Audit\Outcome;
 use App\Execution\CommandResult;
 use App\Execution\CommandRunner;
 use App\Execution\ProjectDirectory;
+use App\Execution\RegistriesProxyUnavailableException;
 use App\Grant\GrantRules;
 use App\Grant\Grants;
 use App\Grant\InvalidGrantsException;
@@ -146,15 +147,28 @@ final readonly class RunCommandTool
     {
         try {
             $result = $run($command);
-        } catch (ReplaceableGitLinkException $e) {
+        } catch (ReplaceableGitLinkException|RegistriesProxyUnavailableException $e) {
             $this->audit($command, $assessment, Outcome::Failed, detail: $e->getMessage());
 
             return CallToolResult::error([new TextContent(\sprintf("Nothing runs until this is fixed: %s\n%s did not run.", $e->getMessage(), $command))]);
         }
-        $check = $this->injectionClassifier->check($result->output);
+        $check = $this->injectionClassifier->check($this->checkedText($result));
         $this->audit($command, $assessment, $outcome, $result, check: $check);
 
         return $this->outputReport->result($result, $check);
+    }
+
+    /**
+     * The output, and the host names the command chose for the connections the sandbox blocked: both reach the agent.
+     */
+    private function checkedText(CommandResult $result): string
+    {
+        $blocked = $result->blockedConnections();
+        if ($blocked->isEmpty()) {
+            return $result->output;
+        }
+
+        return $result->output."\n".implode("\n", $blocked->named);
     }
 
     private function audit(string $command, Assessment $assessment, Outcome $outcome, ?CommandResult $result = null, ?string $detail = null, ?OutputCheck $check = null): void
@@ -171,6 +185,8 @@ final readonly class RunCommandTool
             $detail,
             $check,
             $result?->maskedSecrets,
+            $result?->blockedConnections()->named ?? [],
+            $result?->blockedConnections()->count ?? 0,
         ));
     }
 }

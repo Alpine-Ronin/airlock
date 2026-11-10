@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Sandbox;
 
 use App\Configuration\ConfigDirectory;
+use App\Network\ProxyEndpoint;
+use App\Sandbox\NetworkAccess;
 use App\Sandbox\ReplaceableGitLinkException;
 use App\Sandbox\SandboxExec;
 use App\Sandbox\SandboxPaths;
@@ -39,7 +41,7 @@ final class SandboxExecTest extends TestCase
 
     public function testTheProfileDeniesWritesButToTheProjectAndHidesTheKeys(): void
     {
-        $command = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), cutsNetwork: false)->confine(['bash', '-c', 'ls'], '/Users/me/project');
+        $command = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), network: NetworkAccess::Open)->confine(['bash', '-c', 'ls'], '/Users/me/project');
 
         self::assertSame(['sandbox-exec', '-p'], \array_slice($command, 0, 2));
         self::assertSame(['env', '-u', 'SSH_AUTH_SOCK', '-u', 'SSH_AGENT_PID', '-u', 'GPG_AGENT_INFO', 'bash', '-c', 'ls'], \array_slice($command, 3));
@@ -54,7 +56,7 @@ final class SandboxExecTest extends TestCase
         new Filesystem()->mkdir(self::HOME.'/.config/airlock');
         new Filesystem()->dumpFile(self::HOME.'/.ssh/known_hosts', "github.com ssh-ed25519 AAAA\n");
         $home = (string) realpath(self::HOME);
-        $profile = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), cutsNetwork: false)->confine(['true'], $home, new SshAgent('/private/tmp/agent.sock'))[2];
+        $profile = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), network: NetworkAccess::Open)->confine(['true'], $home, new SshAgent('/private/tmp/agent.sock'))[2];
 
         foreach ([$home.'/.ssh', $home.'/.config/airlock'] as $hidden) {
             $denied = \sprintf('(deny file-read* file-write* (subpath "%s"))', $hidden);
@@ -74,7 +76,7 @@ final class SandboxExecTest extends TestCase
         new Process(['git', 'worktree', 'add', '-q', self::HOME.'/worktree'], $repository)->mustRun();
         $home = (string) realpath(self::HOME);
 
-        $profile = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), cutsNetwork: false)->confine(['true'], $home.'/worktree')[2];
+        $profile = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), network: NetworkAccess::Open)->confine(['true'], $home.'/worktree')[2];
 
         foreach (['/worktree/.git', '/repository/.git/hooks', '/repository/.git/config', '/repository/.git/commondir', '/repository/.git/config.worktree', '/repository/.git/worktrees/worktree/hooks', '/repository/.git/worktrees/worktree/config', '/repository/.git/worktrees/worktree/commondir'] as $readOnly) {
             self::assertStringContainsString(\sprintf('(deny file-write* (subpath "%s%s"))', $home, $readOnly), $profile);
@@ -86,7 +88,7 @@ final class SandboxExecTest extends TestCase
         new Filesystem()->mkdir(self::HOME.'/project/.git');
         $home = (string) realpath(self::HOME);
 
-        $profile = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), cutsNetwork: false)->confine(['true'], $home.'/project')[2];
+        $profile = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), network: NetworkAccess::Open)->confine(['true'], $home.'/project')[2];
 
         self::assertStringContainsString(\sprintf('(deny file-write-unlink (literal "%s/project/.git"))', $home), $profile);
     }
@@ -96,7 +98,7 @@ final class SandboxExecTest extends TestCase
         $repository = $this->worktreeOfATemporaryRepository();
         $home = (string) realpath(self::HOME);
 
-        $profile = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), cutsNetwork: false)->confine(['true'], $home.'/worktree')[2];
+        $profile = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), network: NetworkAccess::Open)->confine(['true'], $home.'/worktree')[2];
 
         foreach (['', '/.git', '/.git/worktrees', '/.git/worktrees/worktree'] as $fixed) {
             self::assertStringContainsString(\sprintf('(deny file-write-unlink (literal "%s%s"))', $repository, $fixed), $profile, 'Seatbelt lets a command write in the temporary directories.');
@@ -113,7 +115,7 @@ final class SandboxExecTest extends TestCase
         $this->expectException(ReplaceableGitLinkException::class);
         $this->expectExceptionMessageIsOrContains($repository.'-link is a symbolic link');
 
-        new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), cutsNetwork: false)->confine(['true'], $home.'/worktree');
+        new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), network: NetworkAccess::Open)->confine(['true'], $home.'/worktree');
     }
 
     public function testAGitFilePointingAtNoGitDirectoryMakesNothingThere(): void
@@ -122,7 +124,7 @@ final class SandboxExecTest extends TestCase
         new Filesystem()->dumpFile(self::HOME.'/project/.git', 'gitdir: ../.kube'."\n");
         $home = (string) realpath(self::HOME);
 
-        $profile = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), cutsNetwork: false)->confine(['true'], $home.'/project')[2];
+        $profile = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), network: NetworkAccess::Open)->confine(['true'], $home.'/project')[2];
 
         self::assertSame(['.', '..'], scandir($home.'/.kube'), 'Nothing is made in a directory that is no git directory.');
         self::assertStringContainsString(\sprintf('(deny file-write* (subpath "%s/project/.git"))', $home), $profile);
@@ -130,15 +132,33 @@ final class SandboxExecTest extends TestCase
 
     public function testStrictCutsTheNetwork(): void
     {
-        $command = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), cutsNetwork: true)->confine(['true'], '/p');
+        $command = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), network: NetworkAccess::None)->confine(['true'], '/p');
 
         self::assertStringContainsString('(deny network*)', $command[2]);
+    }
+
+    public function testLimitedToTheRegistriesOnlyTheProxysPortIsReachable(): void
+    {
+        $command = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), network: NetworkAccess::Registries)
+            ->confine(['true'], '/p', registriesProxy: ProxyEndpoint::fromAnnounced('127.0.0.1:41234'));
+
+        self::assertStringContainsString("(deny network*)\n(allow network* (local unix))\n(allow network-outbound (remote ip \"localhost:41234\"))", $command[2]);
+        self::assertContains('HTTPS_PROXY=http://127.0.0.1:41234', $command);
+        self::assertContains('no_proxy=localhost,127.0.0.1', $command);
+        self::assertSame('true', $command[\count($command) - 1]);
+    }
+
+    public function testLimitedToTheRegistriesACommandWithoutAProxyReachesAnyHost(): void
+    {
+        $command = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), network: NetworkAccess::Registries)->confine(['true'], '/p');
+
+        self::assertStringNotContainsString('network', $command[2], 'A command reaching a remote gets no proxy: its network stays open.');
     }
 
     public function testALentSshAgentComesWithTheKnownHostsAlone(): void
     {
         new Filesystem()->dumpFile(self::HOME.'/.ssh/known_hosts', "github.com ssh-ed25519 AAAA\n");
-        $sandbox = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), cutsNetwork: false);
+        $sandbox = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), network: NetworkAccess::Open);
         $allowed = \sprintf('(allow file-read* (literal "%s/.ssh/known_hosts"))', realpath(self::HOME));
 
         $lent = $sandbox->confine(['true'], '/p', new SshAgent('/private/tmp/agent.sock'))[2];
@@ -151,7 +171,7 @@ final class SandboxExecTest extends TestCase
 
     public function testALentSshAgentKeepsItsVariable(): void
     {
-        $command = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), cutsNetwork: false)->confine(['true'], '/p', new SshAgent('/private/tmp/agent.sock'));
+        $command = new SandboxExec(new SandboxPaths(self::HOME, '/nonexistent', new ConfigDirectory(self::HOME)), network: NetworkAccess::Open)->confine(['true'], '/p', new SshAgent('/private/tmp/agent.sock'));
 
         self::assertSame(['env', '-u', 'SSH_AGENT_PID', '-u', 'GPG_AGENT_INFO', 'true'], \array_slice($command, 3));
     }

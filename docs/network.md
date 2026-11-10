@@ -1,6 +1,6 @@
 # Airlock: registries-only network
 
-Status: agreed. Step 1, the proxy, is built.
+Status: agreed. Steps 1 and 2 are built: `AIRLOCK_SANDBOX=registries` is opt-in.
 
 ## The problem
 

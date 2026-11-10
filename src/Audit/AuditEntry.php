@@ -10,9 +10,11 @@ use App\Policy\Verdict;
 final readonly class AuditEntry
 {
     /**
-     * @param list<string> $reasons       why the policy did not find it plain
-     * @param int|null     $exitCode      null when it did not run, or was stopped
-     * @param int|null     $maskedSecrets null when it did not run
+     * @param list<string> $reasons            why the policy did not find it plain
+     * @param int|null     $exitCode           null when it did not run, or was stopped
+     * @param int|null     $maskedSecrets      null when it did not run
+     * @param list<string> $blockedConnections the first hosts the sandbox kept it from, as host:port
+     * @param int<0, max>  $blockedCount       how many it kept it from in all
      */
     public function __construct(
         public \DateTimeImmutable $at,
@@ -26,6 +28,8 @@ final readonly class AuditEntry
         public ?string $detail = null,
         public ?OutputCheck $outputCheck = null,
         public ?int $maskedSecrets = null,
+        public array $blockedConnections = [],
+        public int $blockedCount = 0,
     ) {
     }
 
@@ -47,6 +51,8 @@ final readonly class AuditEntry
             'output_check' => $this->outputCheck?->verdict->value,
             'output_check_reason' => $this->outputCheck?->reason?->value,
             'masked_secrets' => $this->maskedSecrets,
+            'blocked_connections' => $this->blockedConnections,
+            'blocked_count' => $this->blockedCount,
         ];
     }
 }

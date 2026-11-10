@@ -12,6 +12,12 @@ if (!is_file(dirname(__DIR__).'/vendor/autoload_runtime.php')) {
     throw new LogicException('Symfony Runtime is missing. Try running "composer require symfony/runtime".');
 }
 
+// The relay runs inside the sandbox, where Symfony's cache cannot be written: it starts before the kernel.
+if ('network-relay' === ($argv[1] ?? null)) {
+    require_once dirname(__DIR__).'/vendor/autoload.php';
+    exit(App\Network\NetworkRelay::run(array_slice($argv, 2)));
+}
+
 require_once dirname(__DIR__).'/vendor/autoload_runtime.php';
 
 return function (array $context) {
