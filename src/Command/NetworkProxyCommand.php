@@ -41,6 +41,12 @@ final class NetworkProxyCommand extends Command implements SignalableCommandInte
     #[\Override]
     public function getSubscribedSignals(): array
     {
+        // Without pcntl (the official PHP image has none), SIGTERM ends the proxy at once, as it does any program:
+        // every decision is already written, and the runner removes the proxy's directory.
+        if (!\extension_loaded('pcntl')) {
+            return [];
+        }
+
         return [\SIGTERM, \SIGINT];
     }
 

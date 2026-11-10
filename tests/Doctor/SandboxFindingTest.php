@@ -22,9 +22,9 @@ final class SandboxFindingTest extends TestCase
 
         self::assertSame(Health::Warning, $finding->health);
         self::assertStringStartsWith('Sandbox (bubblewrap):', $finding->text);
-        self::assertStringContainsString('Commands can reach the network', $finding->text);
-        self::assertStringContainsString('AIRLOCK_SANDBOX=registries', $finding->text);
-        self::assertStringContainsString('AIRLOCK_SANDBOX=strict', $finding->text);
+        self::assertStringContainsString('Commands can reach any host', $finding->text);
+        self::assertStringContainsString('AIRLOCK_SANDBOX=open', $finding->text);
+        self::assertStringContainsString('AIRLOCK_SANDBOX=auto keeps them to the package registries', $finding->text);
     }
 
     public function testASandboxKeepingTheNetworkToTheRegistriesIsFine(): void
@@ -32,7 +32,7 @@ final class SandboxFindingTest extends TestCase
         $finding = SandboxFinding::of(new Bubblewrap($this->paths(), NetworkAccess::Registries, ['airlock']));
 
         self::assertSame(Health::Ok, $finding->health);
-        self::assertStringContainsString('on the network, the package registries only', $finding->text);
+        self::assertStringContainsString('on the network, the package registries and the hosts network.yaml allows, but any host for a command reaching a git or SSH remote', $finding->text);
     }
 
     public function testASandboxWithoutNetworkIsFine(): void

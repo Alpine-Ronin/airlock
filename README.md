@@ -36,7 +36,7 @@ sends goes through five steps:
 | 1 | **Read** | Parsed the way a shell reads it: a grant for `make test` never covers `make test; rm -rf ~`. |
 | 2 | **Weighed** | Plain; *asked every time* (`sudo`, a recursive delete, `git push`, a download piped into a shell, a secret file, anything that cannot be read whole); or refused by your policy. |
 | 3 | **Asked** | In your client, with the reason first: *once*, *this session*, *always for this project* or *refuse*. |
-| 4 | **Run** | In a sandbox, bubblewrap on Linux and `sandbox-exec` on macOS: it writes only to the project, `/tmp` and package caches, and cannot read your keys or Airlock's own files. |
+| 4 | **Run** | In a sandbox, bubblewrap on Linux and `sandbox-exec` on macOS: it writes only to the project, `/tmp` and package caches, cannot read your keys or Airlock's own files, and on the network reaches the package registries and the hosts you allow (a command reaching a git or SSH remote, any host). |
 | 5 | **Checked** | The output goes back marked as data, with secrets masked, and a model flags it when it looks like a prompt injection. |
 
 Every decision is kept in an audit log, readable as the MCP resource `airlock://audit`. How and why:
@@ -339,7 +339,7 @@ variables, which win.
 
 | Variable | Default | What it does |
 |---|---|---|
-| `AIRLOCK_SANDBOX` | `auto` | `auto` (sandboxed), `registries` (sandboxed, reaching only the package registries, through a proxy Airlock starts per command; a command that reaches a git or SSH remote still reaches any host), `strict` (sandboxed, no network) or `off`. With `auto`, `airlock doctor` warns that commands can reach the network |
+| `AIRLOCK_SANDBOX` | `auto` | `auto` (sandboxed, reaching only the package registries and the hosts `network.yaml` allows, through a proxy Airlock starts per command; a command that reaches a git or SSH remote still reaches any host), `open` (sandboxed, any host: before 0.6.0, what `auto` did), `strict` (sandboxed, no network) or `off`. `registries` is another name for `auto`. With `open`, `airlock doctor` warns that commands can reach any host |
 | `AIRLOCK_TIMEOUT` | `120` | Seconds a command may run before it is stopped |
 | `AIRLOCK_PROJECT_DIR` | the current directory | The project commands run in |
 | `AIRLOCK_STATE_KEY` | a key per process | Signs the state a pending approval carries; at least 32 bytes |
@@ -359,7 +359,7 @@ Airlock's own files live in `~/.config/airlock/` (or `$XDG_CONFIG_HOME/airlock/`
 | `models.yaml` | What `airlock configure` set up: the model API, its key, the models |
 | `policy.yaml` | Commands and hosts you refuse everywhere |
 | `projects/<name>-<hash>/policy.yaml` | Commands and hosts you refuse in one project |
-| `network.yaml` | With `AIRLOCK_SANDBOX=registries`, hosts and local ports commands may reach besides the package registries, everywhere |
+| `network.yaml` | Hosts and local ports commands may reach besides the package registries, everywhere |
 | `projects/<name>-<hash>/network.yaml` | The same, in one project |
 | `projects/<name>-<hash>/grants.yaml` | What *always for this project* allowed, with the files each grant needs unchanged |
 | `audit.jsonl` | Every decision, one JSON object per line. At 10 MiB, about 20,000 decisions, it moves to `audit.1.jsonl`, the one before to `audit.2.jsonl`, and so on up to `audit.5.jsonl`: the oldest goes |
@@ -393,7 +393,7 @@ refuse_hosts:
   - api.github.com   # never reached from the sandbox, on any port, even though Composer uses it
 ```
 
-With `AIRLOCK_SANDBOX=registries`, a command reaches the package registries (Packagist, npm, PyPI, crates.io, Go,
+By default, a command reaches the package registries (Packagist, npm, PyPI, crates.io, Go,
 RubyGems, and GitHub's downloads) and nothing else. `network.yaml`, yours alone, adds to that:
 
 ```yaml

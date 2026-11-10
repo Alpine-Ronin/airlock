@@ -13,7 +13,7 @@ final class NetworkDescription
     {
         return match ($network) {
             NetworkAccess::Open => '',
-            NetworkAccess::Registries => '; on the network, the package registries only',
+            NetworkAccess::Registries => '; on the network, the package registries and the hosts network.yaml allows, but any host for a command reaching a git or SSH remote',
             NetworkAccess::None => '; no network',
         };
     }

@@ -52,6 +52,7 @@ final readonly class CommandPolicy
         $verdict = Verdict::Plain;
         $reasons = [];
         $needsSshAgent = false;
+        $hasOtherParts = false;
         $isDownloadPiped = false;
 
         foreach ($line->commands as $command) {
@@ -60,7 +61,9 @@ final readonly class CommandPolicy
                 $reasons[] = \sprintf('`%s`: %s', implode(' ', $command->words), $reason);
                 $verdict = $concernVerdict->isWorseThan($verdict) ? $concernVerdict : $verdict;
             }
-            $needsSshAgent = $needsSshAgent || $this->reachesARemote($command->programWords());
+            $reachesARemote = $this->reachesARemote($command->programWords());
+            $needsSshAgent = $needsSshAgent || $reachesARemote;
+            $hasOtherParts = $hasOtherParts || (!$reachesARemote && !$this->isPlainCd($command));
             $isDownloadPiped = $isDownloadPiped || \in_array(basename($command->programWords()[0] ?? ''), self::DOWNLOADERS, true);
         }
 
@@ -69,7 +72,15 @@ final readonly class CommandPolicy
             $verdict = Verdict::AskEveryTime->isWorseThan($verdict) ? Verdict::AskEveryTime : $verdict;
         }
 
-        return new Assessment($verdict, $reasons, $needsSshAgent);
+        return new Assessment($verdict, $reasons, $needsSshAgent, $needsSshAgent && $hasOtherParts);
+    }
+
+    /**
+     * A `cd` with no redirection, as the grants read one: `cd . > /dev/tcp/host/port` is no plain `cd`.
+     */
+    private function isPlainCd(SimpleCommand $command): bool
+    {
+        return 'cd' === ($command->programWords()[0] ?? null) && [] === $command->redirections;
     }
 
     /**

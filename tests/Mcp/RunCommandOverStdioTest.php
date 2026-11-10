@@ -219,6 +219,41 @@ final class RunCommandOverStdioTest extends TestCase
         self::assertFileExists(new ConfigDirectory($this->home)->forProject($this->project).'/grants.yaml');
     }
 
+    #[RequiresOperatingSystemFamily('Linux')]
+    public function testAGrantedCommandReachingARemoteKeepsTheNetworkItHadWhenApproved(): void
+    {
+        $socket = stream_socket_server('tcp://127.0.0.1:0');
+        self::assertIsResource($socket);
+        $address = (string) stream_socket_get_name($socket, false);
+        fclose($socket);
+        $server = new Process([\PHP_BINARY, '-S', $address, '-t', self::ROOT]);
+        $server->start();
+        $server->waitUntil(static fn (string $type, string $output): bool => str_contains($output, 'started'));
+        $command = \sprintf('git ls-remote http://%s/repository.git', $address);
+        try {
+            $client = $this->client();
+            $approved = $client->request($this->modernCall(2, $command, 'always', $this->askState($client, $command)));
+            $granted = $client->request($this->modernCall(3, $command));
+        } finally {
+            $server->stop(0);
+        }
+
+        self::assertStringContainsString('not found', $this->text($approved, 'result', 'content', 0, 'text'), 'Approved, a command reaching a remote reaches this machine\'s server, outside the sandbox.');
+        self::assertSame($this->text($approved, 'result', 'content', 0, 'text'), $this->text($granted, 'result', 'content', 0, 'text'), 'Under a grant, it must keep the same network.');
+    }
+
+    public function testGrantsForARemoteAndAnotherCommandDoNotCoverThemJoined(): void
+    {
+        $client = $this->client();
+        foreach (['git remote -v', 'cat /proc/net/dev'] as $id => $granted) {
+            $client->request($this->modernCall(10 + $id, $granted, 'always', $this->askState($client, $granted)));
+        }
+
+        $answer = $client->request($this->modernCall(20, 'git remote -v; cat /proc/net/dev'));
+
+        self::assertSame('input_required', $this->field($answer, 'result', 'resultType'), 'The remote\'s open network would reach the other command: the user sees the line first.');
+    }
+
     public function testAGrantedScriptIsAskedAboutAgainOnceItChanges(): void
     {
         $this->filesystem->dumpFile($this->project.'/run.sh', "echo first\n");

@@ -72,8 +72,17 @@ final readonly class CommandRunner
     }
 
     /**
-     * Runs it with the user's SSH agent lent, when there is one: for a command the user has just approved. It reaches
-     * a remote, over SSH as often as HTTPS, so its network is not limited to the registries.
+     * Runs a command that reaches a remote (git fetch, ssh...): over SSH as often as HTTPS, to a host no list names, so
+     * its network is not limited to the registries, whether the user just approved it or a grant covers it.
+     */
+    public function runReachingARemote(string $commandLine): CommandResult
+    {
+        return $this->runConfined($commandLine, null, null);
+    }
+
+    /**
+     * Runs a command that reaches a remote with the user's SSH agent lent, when there is one: for a command the user
+     * has just approved.
      */
     public function runWithSshAgent(string $commandLine): CommandResult
     {

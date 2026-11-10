@@ -1,11 +1,12 @@
 # Airlock: registries-only network
 
-Status: agreed. Steps 1 to 3 are built: `AIRLOCK_SANDBOX=registries` is opt-in.
+Status: built. `auto` limits the network to the registries since 0.6.0.
 
 ## The problem
 
-Under `AIRLOCK_SANDBOX=auto`, the default, a sandboxed command reaches any host.
-The sandbox keeps it from writing outside the project and from reading the
+Before 0.6.0, under `AIRLOCK_SANDBOX=auto`, the default, a sandboxed command
+reached any host.
+The sandbox kept it from writing outside the project and from reading the
 user's keys, but not from reading the project and sending it elsewhere: a
 `curl`, a `node -e` or a test the agent edited can post the source, the
 `.env.example`, the git history, to a host an injection named. The policy asks
@@ -13,25 +14,25 @@ about the spellings it can see (a download piped into a shell, a `curl` sending
 a file); a program that opens a socket itself shows none of them.
 
 `AIRLOCK_SANDBOX=strict` cuts the network off, and with it `composer install`,
-`npm ci` and `pip install`: most users keep `auto`, and `airlock doctor` can
+`npm ci` and `pip install`: most users kept `auto`, and `airlock doctor` could
 only warn them.
 
 The aim: by default a command reaches the package registries and nothing else,
 so the everyday commands still work and a command an injection slipped in has
 nowhere to send what it read.
 
-## What changes for the user
+## What changed for the user
 
-`AIRLOCK_SANDBOX` keeps its four meanings, with one more value:
+`AIRLOCK_SANDBOX` has these values since 0.6.0:
 
 | Value | Writes | Network |
 |---|---|---|
-| `auto` (default) | project, `/tmp`, package caches | **registries only** (new) |
-| `open` (new) | same | any host: what `auto` does today |
+| `auto` (default; `registries` is another name) | project, `/tmp`, package caches | the registries and the hosts `network.yaml` allows; any host for a command reaching a git or SSH remote |
+| `open` | same | any host: what `auto` did before 0.6.0 |
 | `strict` | same | none |
 | `off` | anything, every command asked | any host |
 
-`auto` changing meaning is the point of this work, and a change of behaviour
+`auto` changing meaning was the point of this work, and a change of behaviour
 for every user: it ships in a minor release before 1.0, said first in the
 changelog, with `open` as the one-word way back.
 
@@ -50,8 +51,8 @@ evil.example:443
 </blocked-hosts>
 ```
 
-The audit log records each blocked host with the command, and `airlock log`
-shows it. `airlock doctor` stops warning under `auto` and warns under `open`.
+The audit log records each blocked host with the command. `airlock doctor`
+does not warn under `auto`, and warns under `open`.
 
 ## The hosts
 
@@ -130,10 +131,15 @@ finds no route and fails: closed, never open.
 (`needsSshAgent`): they need their own host, over SSH as often as HTTPS. They
 run with the network open, as under `open`. `git push` is asked every time;
 the others name their remote in the command line or in `.git/config`, which
-the sandbox keeps read-only.
+the sandbox keeps read-only. The open network reaches the whole line, so a line
+joining a remote to anything but another remote or a `cd` without redirection
+(`git remote -v; php job.php`) is asked about even when grants cover each part:
+two grants given apart must not add up to an open network for a script. A line
+made of remotes alone (`git fetch && git pull`) keeps its grants, as each part
+would have the open network on its own.
 
-**Local services.** Under `auto` today, tests reach a database on the user's
-machine (`localhost:5432`). They no longer can. `network.yaml` lists local
+**Local services.** Under the old `auto`, tests reached a database on the
+user's machine (`localhost:5432`). Under the new one they do not, by default. `network.yaml` lists local
 ports (`local: [5432, 6379]`): on Linux the bridge listens on each one
 inside and relays it, through the proxy, to the same port outside; on macOS
 the profile allows each one.

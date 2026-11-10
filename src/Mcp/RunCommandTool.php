@@ -82,8 +82,9 @@ final readonly class RunCommandTool
         $line = $this->parser->parse($command);
         try {
             $assessment = $this->policy->assess($line, $this->policyFiles->refusals());
-            // A grant was given for a command that stays in the sandbox: without one, every command is asked.
-            $isCovered = Verdict::Plain === $assessment->verdict && !$this->sandboxDetector->detect() instanceof NoSandbox && $this->grants->covers($line);
+            // A grant was given for a command that stays in the sandbox: without one, every command is asked. A line
+            // joining a remote to other parts is asked too: the remote's open network would reach the others.
+            $isCovered = Verdict::Plain === $assessment->verdict && !$assessment->mixesARemoteWithOtherParts && !$this->sandboxDetector->detect() instanceof NoSandbox && $this->grants->covers($line);
             $miss = $isCovered || Verdict::Plain !== $assessment->verdict ? null : $this->grants->miss($line);
         } catch (InvalidPolicyException|InvalidGrantsException $e) {
             $this->audit($command, new Assessment(Verdict::Refused), Outcome::Failed, detail: $e->getMessage());
@@ -102,7 +103,9 @@ final readonly class RunCommandTool
         }
 
         if ($isCovered) {
-            return $this->run($command, $assessment, Outcome::RanUnderGrant, $this->runner->run(...));
+            $run = $assessment->needsSshAgent ? $this->runner->runReachingARemote(...) : $this->runner->run(...);
+
+            return $this->run($command, $assessment, Outcome::RanUnderGrant, $run);
         }
 
         $decision = $this->approvals->answer($context, $command, $assessment->verdict);
