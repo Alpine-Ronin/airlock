@@ -1,6 +1,6 @@
 # Airlock: registries-only network
 
-Status: agreed. Nothing here is built yet.
+Status: agreed. Step 1, the proxy, is built.
 
 ## The problem
 
@@ -95,9 +95,11 @@ command reach that proxy and nothing else.
 runner before the sandbox and stopped after it, written on PHP streams
 (`stream_socket_server`, `stream_select`): no new extension, no new
 dependency. It answers `CONNECT host:port` for HTTPS and absolute-URL requests
-for HTTP, checks the host against the list, resolves it itself and refuses
-an address that is loopback, private or link-local, so an allowed name
-cannot point at the machine's own services or a cloud's metadata endpoint. It
+for HTTP, checks the host against the list, resolves it itself (IPv4: every
+registry on the list serves it) and refuses the name if any of its addresses
+is not a public one (loopback, private, link-local, reserved), so an allowed
+name cannot point at the machine's own services or a cloud's metadata
+endpoint. It
 writes one line per decision to a file the runner reads after the command,
 for the output note and the audit log.
 

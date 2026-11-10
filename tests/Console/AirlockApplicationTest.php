@@ -62,7 +62,7 @@ final class AirlockApplicationTest extends KernelTestCase
 
         foreach ($application->all() as $name => $command) {
             $class = ($command instanceof LazyCommand ? $command->getCommand() : $command)::class;
-            if (str_starts_with($class, 'App\\')) {
+            if (str_starts_with($class, 'App\\') && !\in_array($name, AirlockApplication::INTERNAL_COMMANDS, true)) {
                 self::assertFalse($command->isHidden(), \sprintf('%s is Airlock\'s: add it to AirlockApplication::LISTED_COMMANDS and to the examples.', $name));
             }
         }
