@@ -30,7 +30,7 @@ final readonly class RunningProxy
      */
     public function stop(): BlockedConnections
     {
-        $this->process->stop(self::STOP_SECONDS, \SIGTERM);
+        $this->process->stop(self::STOP_SECONDS);
         $blocked = $this->blocked();
         $this->filesystem->remove($this->directory);
 
