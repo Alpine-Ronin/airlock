@@ -18,6 +18,9 @@ final class AirlockApplication extends Application
     /** Airlock's commands, and the console's own ones a user needs. */
     public const array LISTED_COMMANDS = ['configure', 'connect', 'doctor', 'grants', 'log', 'mcp:server', 'help', 'list', 'completion'];
 
+    /** Airlock's commands that Airlock runs itself, never the user: hidden like the framework's. */
+    public const array INTERNAL_COMMANDS = ['network-proxy'];
+
     private bool $areOtherCommandsHidden = false;
 
     #[\Override]
