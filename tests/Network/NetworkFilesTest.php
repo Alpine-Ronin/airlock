@@ -98,6 +98,7 @@ final class NetworkFilesTest extends TestCase
         yield 'the relay\'s port' => ["local: [3128]\n", 'which Airlock\'s relay takes inside the sandbox'];
         yield 'an unknown key' => ["refuse:\n  - make deploy\n", 'refuse'];
         yield 'not YAML' => ["allow: [\n", 'is invalid'];
+        yield 'a key given twice' => ["allow: [a.example]\nallow: [b.example]\n", 'Duplicate key'];
     }
 
     #[DataProvider('invalidNetworkFiles')]
@@ -107,6 +108,16 @@ final class NetworkFilesTest extends TestCase
 
         $this->expectException(InvalidNetworkFileException::class);
         $this->expectExceptionMessageMatches('/'.preg_quote($reason, '/').'/');
+
+        $this->settings();
+    }
+
+    public function testAPolicyRefusingHostsTwiceIsRefusedRatherThanReadInPart(): void
+    {
+        $this->filesystem->dumpFile($this->project.'/.airlock.yaml', "refuse_hosts: [api.github.com]\nrefuse_hosts: [pypi.org]\n");
+
+        $this->expectException(InvalidPolicyException::class);
+        $this->expectExceptionMessage('Duplicate key');
 
         $this->settings();
     }
