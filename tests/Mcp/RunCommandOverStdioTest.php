@@ -219,6 +219,19 @@ final class RunCommandOverStdioTest extends TestCase
         self::assertFileExists(new ConfigDirectory($this->home)->forProject($this->project).'/grants.yaml');
     }
 
+    #[RequiresOperatingSystemFamily('Linux')]
+    public function testAGrantedCommandReachingARemoteKeepsTheNetworkItHadWhenApproved(): void
+    {
+        $command = "git ls-remote --heads . >/dev/null 2>&1; tail -n +3 /proc/net/dev | cut -d: -f1 | tr -d ' ' | sort";
+        $client = $this->client();
+
+        $approved = $client->request($this->modernCall(2, $command, 'always', $this->askState($client, $command)));
+        $granted = $client->request($this->modernCall(3, $command));
+
+        self::assertStringNotContainsString("<command-output exit-code=\"0\">\nlo\n</command-output>", $this->text($approved, 'result', 'content', 0, 'text'), 'Approved, a command reaching a remote has the network.');
+        self::assertSame($this->text($approved, 'result', 'content', 0, 'text'), $this->text($granted, 'result', 'content', 0, 'text'), 'Under a grant, it must keep the same network.');
+    }
+
     public function testAGrantedScriptIsAskedAboutAgainOnceItChanges(): void
     {
         $this->filesystem->dumpFile($this->project.'/run.sh', "echo first\n");

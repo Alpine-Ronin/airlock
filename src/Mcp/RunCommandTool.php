@@ -102,7 +102,9 @@ final readonly class RunCommandTool
         }
 
         if ($isCovered) {
-            return $this->run($command, $assessment, Outcome::RanUnderGrant, $this->runner->run(...));
+            $run = $assessment->needsSshAgent ? $this->runner->runReachingARemote(...) : $this->runner->run(...);
+
+            return $this->run($command, $assessment, Outcome::RanUnderGrant, $run);
         }
 
         $decision = $this->approvals->answer($context, $command, $assessment->verdict);
