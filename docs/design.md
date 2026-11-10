@@ -42,7 +42,8 @@ allowed to read back.
 4. **Run.** In a sandbox: bubblewrap on Linux, `sandbox-exec` on macOS. The
    command can write only to the project, `/tmp` and package caches, and cannot
    read Airlock's own files or the user's keys. On the network it reaches the
-   package registries alone, through a proxy Airlock starts for it
+   package registries and the hosts the user allows, through a proxy Airlock
+   starts for it, but a command reaching a git or SSH remote reaches any host
    ([network.md](network.md)); with `strict`, it has no network.
    Where no sandbox can run, Airlock says so, and asks about every command.
 5. **Checked.** Its output goes back to the agent marked as data, not

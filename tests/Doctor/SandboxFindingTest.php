@@ -32,7 +32,7 @@ final class SandboxFindingTest extends TestCase
         $finding = SandboxFinding::of(new Bubblewrap($this->paths(), NetworkAccess::Registries, ['airlock']));
 
         self::assertSame(Health::Ok, $finding->health);
-        self::assertStringContainsString('on the network, the package registries and the hosts network.yaml allows', $finding->text);
+        self::assertStringContainsString('on the network, the package registries and the hosts network.yaml allows, but any host for a command reaching a git or SSH remote', $finding->text);
     }
 
     public function testASandboxWithoutNetworkIsFine(): void

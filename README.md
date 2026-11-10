@@ -36,7 +36,7 @@ sends goes through five steps:
 | 1 | **Read** | Parsed the way a shell reads it: a grant for `make test` never covers `make test; rm -rf ~`. |
 | 2 | **Weighed** | Plain; *asked every time* (`sudo`, a recursive delete, `git push`, a download piped into a shell, a secret file, anything that cannot be read whole); or refused by your policy. |
 | 3 | **Asked** | In your client, with the reason first: *once*, *this session*, *always for this project* or *refuse*. |
-| 4 | **Run** | In a sandbox, bubblewrap on Linux and `sandbox-exec` on macOS: it writes only to the project, `/tmp` and package caches, cannot read your keys or Airlock's own files, and reaches only the package registries on the network. |
+| 4 | **Run** | In a sandbox, bubblewrap on Linux and `sandbox-exec` on macOS: it writes only to the project, `/tmp` and package caches, cannot read your keys or Airlock's own files, and on the network reaches the package registries and the hosts you allow (a command reaching a git or SSH remote, any host). |
 | 5 | **Checked** | The output goes back marked as data, with secrets masked, and a model flags it when it looks like a prompt injection. |
 
 Every decision is kept in an audit log, readable as the MCP resource `airlock://audit`. How and why:
