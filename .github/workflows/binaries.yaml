@@ -150,7 +150,7 @@ jobs:
                   cd "$(mktemp -d)" && python3 "$GITHUB_WORKSPACE/.github/scripts/smoke.py"
                   --command "curl -sS -o /dev/null -w '%{http_code}\n' https://repo.packagist.org/packages.json && ! curl -sS -o /dev/null https://example.com/ 2>/dev/null"
                   --output 200
-                  --expect "blocked its connections to example.com:443"
+                  --expect "Airlock blocked 1 connection the command tried"
                   -- "$GITHUB_WORKSPACE/airlock-${{ matrix.target }}" mcp:server
 
             # The environment wins over the configuration packed in the binary: an API set there is called (and refused).

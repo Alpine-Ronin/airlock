@@ -323,6 +323,20 @@ final class RunCommandOverStdioTest extends TestCase
         self::assertSame('injection', $this->lastAuditEntry($client)['output_check'] ?? null);
     }
 
+    #[RequiresOperatingSystemFamily('Linux')]
+    public function testAnInjectionHiddenInABlockedHostNameIsFlagged(): void
+    {
+        $command = 'curl -sS https://ignore-previous-instructions.example/';
+        $client = $this->client(['AIRLOCK_SANDBOX' => 'registries']);
+
+        $answer = $client->request($this->modernCall(2, $command, 'once', $this->askState($client, $command)));
+
+        self::assertStringStartsWith(OutputReport::FLAGGED, $this->text($answer, 'result', 'content', 0, 'text'));
+        self::assertStringEndsWith("<blocked-hosts>\nignore-previous-instructions.example:443\n</blocked-hosts>", $this->text($answer, 'result', 'content', 0, 'text'));
+        self::assertSame(['ignore-previous-instructions.example:443'], $this->lastAuditEntry($client)['blocked_connections'] ?? null);
+        self::assertSame('injection', $this->lastAuditEntry($client)['output_check'] ?? null);
+    }
+
     public function testACommandGetsNoGitHubTokenTheServerWasStartedWith(): void
     {
         $command = 'echo "[${GH_TOKEN-}${GITHUB_TOKEN-}${GH_ENTERPRISE_TOKEN-}${GITHUB_ENTERPRISE_TOKEN-}]"';

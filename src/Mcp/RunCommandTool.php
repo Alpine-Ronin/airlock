@@ -152,10 +152,22 @@ final readonly class RunCommandTool
 
             return CallToolResult::error([new TextContent(\sprintf("Nothing runs until this is fixed: %s\n%s did not run.", $e->getMessage(), $command))]);
         }
-        $check = $this->injectionClassifier->check($result->output);
+        $check = $this->injectionClassifier->check($this->checkedText($result));
         $this->audit($command, $assessment, $outcome, $result, check: $check);
 
         return $this->outputReport->result($result, $check);
+    }
+
+    /**
+     * The output, and the host names the command chose for the connections the sandbox blocked: both reach the agent.
+     */
+    private function checkedText(CommandResult $result): string
+    {
+        if ([] === $result->blockedConnections) {
+            return $result->output;
+        }
+
+        return $result->output."\n".implode("\n", $result->blockedConnections);
     }
 
     private function audit(string $command, Assessment $assessment, Outcome $outcome, ?CommandResult $result = null, ?string $detail = null, ?OutputCheck $check = null): void
