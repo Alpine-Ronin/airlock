@@ -44,7 +44,7 @@ final readonly class SandboxExec implements Sandbox
             }
         }
 
-        return ['sandbox-exec', '-p', $this->profile($projectDirectory, $sshAgent instanceof SshAgent, $proxyPort), 'env', ...$unset, ...$variables, ...$command];
+        return ['sandbox-exec', '-p', $this->profile($projectDirectory, $sshAgent instanceof SshAgent, $proxyPort, $registriesProxy->localPorts ?? []), 'env', ...$unset, ...$variables, ...$command];
     }
 
     #[\Override]
@@ -74,7 +74,10 @@ final readonly class SandboxExec implements Sandbox
         );
     }
 
-    private function profile(string $projectDirectory, bool $showsKnownHosts, ?int $proxyPort): string
+    /**
+     * @param list<int> $localPorts
+     */
+    private function profile(string $projectDirectory, bool $showsKnownHosts, ?int $proxyPort, array $localPorts): string
     {
         $temporary = [...$this->paths->private(), ...self::SYSTEM_WRITABLE];
         $writable = array_map(
@@ -102,7 +105,9 @@ final readonly class SandboxExec implements Sandbox
             $rules[] = '(allow network* (local unix))';
         }
         if (null !== $proxyPort) {
-            $rules[] = \sprintf('(allow network-outbound (remote ip "localhost:%d"))', $proxyPort);
+            foreach ([$proxyPort, ...$localPorts] as $port) {
+                $rules[] = \sprintf('(allow network-outbound (remote ip "localhost:%d"))', $port);
+            }
         }
 
         return implode("\n", $rules)."\n";

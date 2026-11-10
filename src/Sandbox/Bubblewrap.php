@@ -19,11 +19,6 @@ final readonly class Bubblewrap implements Sandbox
     /** Where the registries proxy's socket appears inside, in the private /tmp, for the relay to reach. */
     private const string PROXY_SOCKET = '/tmp/airlock-proxy.sock';
 
-    /**
-     * The port the relay listens on, in the command's own network namespace: nothing else listens there when it starts.
-     */
-    private const int RELAY_PORT = 3128;
-
     /** Variables that point a command at an agent acting with the user's credentials. */
     private const array AGENT_VARIABLES = ['SSH_AUTH_SOCK', 'SSH_AGENT_PID', 'GPG_AGENT_INFO', 'DBUS_SESSION_BUS_ADDRESS'];
 
@@ -91,7 +86,8 @@ final readonly class Bubblewrap implements Sandbox
             // command stopped past its time limit takes its processes with it.
             $arguments[] = '--unshare-pid';
             array_push($arguments, ...$this->proxyRoute($registriesProxy));
-            $command = [...$this->airlockCommand, 'network-relay', self::PROXY_SOCKET, (string) self::RELAY_PORT, '--', ...$command];
+            $localPorts = array_map(strval(...), $registriesProxy->localPorts);
+            $command = [...$this->airlockCommand, 'network-relay', self::PROXY_SOCKET, (string) ProxyEndpoint::RELAY_PORT, ...$localPorts, '--', ...$command];
         }
         // --new-session: a command must not reach the terminal Airlock runs in (TIOCSTI).
         array_push($arguments, '--die-with-parent', '--new-session', '--chdir', $projectDirectory, '--', ...$command);
@@ -137,7 +133,7 @@ final readonly class Bubblewrap implements Sandbox
             throw new \LogicException('bubblewrap reaches the registries proxy through its socket file, and it announced none.');
         }
         $arguments = ['--bind', $registriesProxy->socketFile, self::PROXY_SOCKET];
-        foreach (ProxyEndpoint::variablesFor(self::RELAY_PORT) as $name => $value) {
+        foreach (ProxyEndpoint::variablesFor(ProxyEndpoint::RELAY_PORT) as $name => $value) {
             $arguments[] = '--setenv';
             $arguments[] = $name;
             $arguments[] = $value;

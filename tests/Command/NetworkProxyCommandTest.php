@@ -56,6 +56,14 @@ final class NetworkProxyCommandTest extends KernelTestCase
         self::assertStringContainsString('"0.0.0.0:8080" is neither unix:///absolute/path nor 127.0.0.1:<port>.', $tester->getDisplay());
     }
 
+    public function testAnAllowedHostMustBeAHostAndPort(): void
+    {
+        $tester = $this->tester();
+
+        self::assertSame(Command::INVALID, $tester->execute(['--listen' => '127.0.0.1:0', '--log' => self::LOG, '--allow' => ['*.github.io:443']]));
+        self::assertStringContainsString('--allow: "*.github.io" is not a host name.', $tester->getDisplay());
+    }
+
     public function testTheLogFileIsRequired(): void
     {
         $tester = $this->tester();

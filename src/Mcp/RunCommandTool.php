@@ -16,6 +16,7 @@ use App\Grant\Grants;
 use App\Grant\InvalidGrantsException;
 use App\Grant\ProjectGrants;
 use App\Grant\SessionGrants;
+use App\Network\InvalidNetworkFileException;
 use App\Output\InjectionClassifier;
 use App\Output\OutputCheck;
 use App\Policy\Assessment;
@@ -147,7 +148,7 @@ final readonly class RunCommandTool
     {
         try {
             $result = $run($command);
-        } catch (ReplaceableGitLinkException|RegistriesProxyUnavailableException $e) {
+        } catch (ReplaceableGitLinkException|RegistriesProxyUnavailableException|InvalidNetworkFileException|InvalidPolicyException $e) {
             $this->audit($command, $assessment, Outcome::Failed, detail: $e->getMessage());
 
             return CallToolResult::error([new TextContent(\sprintf("Nothing runs until this is fixed: %s\n%s did not run.", $e->getMessage(), $command))]);
