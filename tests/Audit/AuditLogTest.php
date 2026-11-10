@@ -105,7 +105,7 @@ final class AuditLogTest extends TestCase
         $this->log->append(new AuditEntry(new \DateTimeImmutable('2026-11-05T10:00:00+00:00'), '/project', 'rm -rf build', Verdict::AskEveryTime, Outcome::RefusedByUser, ['`rm -rf build`: it deletes recursively']));
 
         self::assertSame(
-            ['{"at":"2026-11-05T10:00:00+00:00","project":"/project","command":"rm -rf build","verdict":"ask_every_time","outcome":"refused_by_user","reasons":["`rm -rf build`: it deletes recursively"],"exit_code":null,"timed_out":false,"detail":null,"output_check":null,"output_check_reason":null,"masked_secrets":null}'],
+            ['{"at":"2026-11-05T10:00:00+00:00","project":"/project","command":"rm -rf build","verdict":"ask_every_time","outcome":"refused_by_user","reasons":["`rm -rf build`: it deletes recursively"],"exit_code":null,"timed_out":false,"detail":null,"output_check":null,"output_check_reason":null,"masked_secrets":null,"blocked_connections":[]}'],
             $this->log->lastEntriesFor('/project', 10),
         );
     }

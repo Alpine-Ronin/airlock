@@ -339,7 +339,7 @@ variables, which win.
 
 | Variable | Default | What it does |
 |---|---|---|
-| `AIRLOCK_SANDBOX` | `auto` | `auto` (sandboxed), `strict` (sandboxed, no network) or `off`. With `auto`, `airlock doctor` warns that commands can reach the network |
+| `AIRLOCK_SANDBOX` | `auto` | `auto` (sandboxed), `registries` (sandboxed, reaching only the package registries, through a proxy Airlock starts per command; a command that reaches a git or SSH remote still reaches any host), `strict` (sandboxed, no network) or `off`. With `auto`, `airlock doctor` warns that commands can reach the network |
 | `AIRLOCK_TIMEOUT` | `120` | Seconds a command may run before it is stopped |
 | `AIRLOCK_PROJECT_DIR` | the current directory | The project commands run in |
 | `AIRLOCK_STATE_KEY` | a key per process | Signs the state a pending approval carries; at least 32 bytes |

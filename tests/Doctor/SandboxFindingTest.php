@@ -8,6 +8,7 @@ use App\Configuration\ConfigDirectory;
 use App\Doctor\Health;
 use App\Doctor\SandboxFinding;
 use App\Sandbox\Bubblewrap;
+use App\Sandbox\NetworkAccess;
 use App\Sandbox\NoSandbox;
 use App\Sandbox\SandboxExec;
 use App\Sandbox\SandboxPaths;
@@ -17,17 +18,26 @@ final class SandboxFindingTest extends TestCase
 {
     public function testASandboxThatLeavesTheNetworkOpenIsAWarning(): void
     {
-        $finding = SandboxFinding::of(new Bubblewrap($this->paths(), cutsNetwork: false));
+        $finding = SandboxFinding::of(new Bubblewrap($this->paths(), NetworkAccess::Open, ['airlock']));
 
         self::assertSame(Health::Warning, $finding->health);
         self::assertStringStartsWith('Sandbox (bubblewrap):', $finding->text);
         self::assertStringContainsString('Commands can reach the network', $finding->text);
+        self::assertStringContainsString('AIRLOCK_SANDBOX=registries', $finding->text);
         self::assertStringContainsString('AIRLOCK_SANDBOX=strict', $finding->text);
+    }
+
+    public function testASandboxKeepingTheNetworkToTheRegistriesIsFine(): void
+    {
+        $finding = SandboxFinding::of(new Bubblewrap($this->paths(), NetworkAccess::Registries, ['airlock']));
+
+        self::assertSame(Health::Ok, $finding->health);
+        self::assertStringContainsString('on the network, the package registries only', $finding->text);
     }
 
     public function testASandboxWithoutNetworkIsFine(): void
     {
-        $finding = SandboxFinding::of(new SandboxExec($this->paths(), cutsNetwork: true));
+        $finding = SandboxFinding::of(new SandboxExec($this->paths(), network: NetworkAccess::None));
 
         self::assertSame(Health::Ok, $finding->health);
         self::assertStringContainsString('no network', $finding->text);

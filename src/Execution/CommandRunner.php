@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Execution;
 
+use App\Connect\AirlockExecutable;
+use App\Network\ProxyEndpoint;
 use App\Output\SecretMasker;
+use App\Sandbox\NetworkAccess;
 use App\Sandbox\SandboxDetector;
 use App\Sandbox\SshAgent;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -40,22 +43,38 @@ final readonly class CommandRunner
         private int $timeoutSeconds,
         #[Autowire(env: 'default::SSH_AUTH_SOCK')]
         private ?string $sshAgentSocket = null,
+        private RegistriesProxy $registriesProxy = new RegistriesProxy(new AirlockExecutable(__DIR__.'/../..')),
     ) {
     }
 
+    /**
+     * @throws RegistriesProxyUnavailableException when the network is limited to the registries and no proxy starts
+     */
     public function run(string $commandLine): CommandResult
     {
-        return $this->runConfined($commandLine, null);
+        $sandbox = $this->sandboxDetector->detect();
+        if (NetworkAccess::Registries !== $sandbox->network()) {
+            return $this->runConfined($commandLine, null, null);
+        }
+        $proxy = $this->registriesProxy->start($sandbox);
+        try {
+            $result = $this->runConfined($commandLine, null, $proxy->endpoint);
+        } finally {
+            $blockedConnections = $proxy->stop();
+        }
+
+        return $result->withBlockedConnections($blockedConnections);
     }
 
     /**
-     * Runs it with the user's SSH agent lent, when there is one: for a command the user has just approved.
+     * Runs it with the user's SSH agent lent, when there is one: for a command the user has just approved. It reaches
+     * a remote, over SSH as often as HTTPS, so its network is not limited to the registries.
      */
     public function runWithSshAgent(string $commandLine): CommandResult
     {
         $hasAgent = null !== $this->sshAgentSocket && '' !== $this->sshAgentSocket && file_exists($this->sshAgentSocket);
 
-        return $this->runConfined($commandLine, $hasAgent ? new SshAgent($this->sshAgentSocket) : null);
+        return $this->runConfined($commandLine, $hasAgent ? new SshAgent($this->sshAgentSocket) : null, null);
     }
 
     /**
@@ -80,9 +99,9 @@ final readonly class CommandRunner
         return $this->runProcess(['git', ...$arguments], [...$this->withoutAirlockEnvironment(), ...array_fill_keys([...self::GITHUB_COM_TOKENS, ...self::ENTERPRISE_TOKENS], false)]);
     }
 
-    private function runConfined(string $commandLine, ?SshAgent $sshAgent): CommandResult
+    private function runConfined(string $commandLine, ?SshAgent $sshAgent, ?ProxyEndpoint $registriesProxy): CommandResult
     {
-        $command = $this->sandboxDetector->detect()->confine(['bash', '-c', $commandLine], $this->projectDirectory->path, $sshAgent);
+        $command = $this->sandboxDetector->detect()->confine(['bash', '-c', $commandLine], $this->projectDirectory->path, $sshAgent, $registriesProxy);
 
         return $this->runProcess($command, [...$this->withoutAirlockEnvironment(), ...array_fill_keys([...self::GITHUB_COM_TOKENS, ...self::ENTERPRISE_TOKENS], false)]);
     }

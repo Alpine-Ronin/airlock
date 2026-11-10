@@ -10,6 +10,7 @@ use App\Audit\Outcome;
 use App\Execution\CommandResult;
 use App\Execution\CommandRunner;
 use App\Execution\ProjectDirectory;
+use App\Execution\RegistriesProxyUnavailableException;
 use App\Grant\GrantRules;
 use App\Grant\Grants;
 use App\Grant\InvalidGrantsException;
@@ -146,7 +147,7 @@ final readonly class RunCommandTool
     {
         try {
             $result = $run($command);
-        } catch (ReplaceableGitLinkException $e) {
+        } catch (ReplaceableGitLinkException|RegistriesProxyUnavailableException $e) {
             $this->audit($command, $assessment, Outcome::Failed, detail: $e->getMessage());
 
             return CallToolResult::error([new TextContent(\sprintf("Nothing runs until this is fixed: %s\n%s did not run.", $e->getMessage(), $command))]);
@@ -171,6 +172,7 @@ final readonly class RunCommandTool
             $detail,
             $check,
             $result?->maskedSecrets,
+            $result->blockedConnections ?? [],
         ));
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Sandbox;
 
+use App\Connect\AirlockExecutable;
 use App\Execution\ProjectDirectory;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Process\Exception\ExceptionInterface as ProcessException;
@@ -24,6 +25,7 @@ final class SandboxDetector
         private readonly SandboxMode $mode,
         private readonly ExecutableFinder $executableFinder = new ExecutableFinder(),
         private readonly string $operatingSystemFamily = \PHP_OS_FAMILY,
+        private readonly AirlockExecutable $airlockExecutable = new AirlockExecutable(__DIR__.'/../..'),
     ) {
     }
 
@@ -41,36 +43,36 @@ final class SandboxDetector
         if (null !== $overlapped) {
             return new NoSandbox(\sprintf('the project overlaps %s, which no sandbox can then keep a command from changing; open a project apart from it', $overlapped));
         }
-        $cutsNetwork = SandboxMode::Strict === $this->mode;
+        $network = $this->mode->network();
 
         return match ($this->operatingSystemFamily) {
-            'Linux' => $this->bubblewrap($cutsNetwork),
-            'Darwin' => $this->sandboxExec($cutsNetwork),
+            'Linux' => $this->bubblewrap($network),
+            'Darwin' => $this->sandboxExec($network),
             default => new NoSandbox(\sprintf('no sandbox is known on %s', $this->operatingSystemFamily)),
         };
     }
 
-    private function bubblewrap(bool $cutsNetwork): Sandbox
+    private function bubblewrap(NetworkAccess $network): Sandbox
     {
         $executable = $this->executableFinder->find('bwrap');
         if (null === $executable) {
             return new NoSandbox('bubblewrap is not installed; install it to keep commands in the project');
         }
 
-        $sandbox = new Bubblewrap($this->paths, $cutsNetwork, $executable);
+        $sandbox = new Bubblewrap($this->paths, $network, $this->airlockExecutable->commandLine(), $executable);
         // Installed is not working: unprivileged user namespaces can be turned off, and then every command fails.
         $failure = $this->probe($sandbox);
 
         return null === $failure ? $sandbox : new NoSandbox(\sprintf('bubblewrap cannot start here: %s', $failure));
     }
 
-    private function sandboxExec(bool $cutsNetwork): Sandbox
+    private function sandboxExec(NetworkAccess $network): Sandbox
     {
         if (null === $this->executableFinder->find('sandbox-exec')) {
             return new NoSandbox('sandbox-exec is missing from this Mac');
         }
 
-        $sandbox = new SandboxExec($this->paths, $cutsNetwork);
+        $sandbox = new SandboxExec($this->paths, $network);
         $failure = $this->probe($sandbox);
 
         return null === $failure ? $sandbox : new NoSandbox(\sprintf('sandbox-exec cannot start here: %s', $failure));

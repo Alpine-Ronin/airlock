@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Sandbox;
 
+use App\Network\ListenAddress;
+use App\Network\ProxyEndpoint;
+
 /**
  * Linux: the whole system mounted read-only, the writable paths bound back writable, private temporary directories,
  * and what must stay unread covered by an empty, read-only mount.
@@ -13,18 +16,30 @@ final readonly class Bubblewrap implements Sandbox
     /** Where a lent SSH agent appears inside: in the private /tmp, so it exists for this command only. */
     private const string SSH_AGENT_SOCKET = '/tmp/airlock-ssh-agent.sock';
 
+    /** Where the registries proxy's socket appears inside, in the private /tmp, for the relay to reach. */
+    private const string PROXY_SOCKET = '/tmp/airlock-proxy.sock';
+
+    /**
+     * The port the relay listens on, in the command's own network namespace: nothing else listens there when it starts.
+     */
+    private const int RELAY_PORT = 3128;
+
     /** Variables that point a command at an agent acting with the user's credentials. */
     private const array AGENT_VARIABLES = ['SSH_AUTH_SOCK', 'SSH_AGENT_PID', 'GPG_AGENT_INFO', 'DBUS_SESSION_BUS_ADDRESS'];
 
+    /**
+     * @param non-empty-list<string> $airlockCommand how Airlock itself is started, to run the relay inside
+     */
     public function __construct(
         private SandboxPaths $paths,
-        private bool $cutsNetwork,
+        private NetworkAccess $network,
+        private array $airlockCommand,
         private string $executable = 'bwrap',
     ) {
     }
 
     #[\Override]
-    public function confine(array $command, string $projectDirectory, ?SshAgent $sshAgent = null): array
+    public function confine(array $command, string $projectDirectory, ?SshAgent $sshAgent = null, ?ProxyEndpoint $registriesProxy = null): array
     {
         $arguments = [$this->executable, '--ro-bind', '/', '/', '--dev', '/dev', '--proc', '/proc'];
         foreach ($this->paths->private() as $private) {
@@ -67,8 +82,13 @@ final readonly class Bubblewrap implements Sandbox
             $arguments[] = 'SSH_AUTH_SOCK';
             $arguments[] = self::SSH_AGENT_SOCKET;
         }
-        if ($this->cutsNetwork) {
+        $isThroughProxy = NetworkAccess::Registries === $this->network && $registriesProxy instanceof ProxyEndpoint;
+        if (NetworkAccess::None === $this->network || $isThroughProxy) {
             $arguments[] = '--unshare-net';
+        }
+        if ($isThroughProxy) {
+            array_push($arguments, ...$this->proxyRoute($registriesProxy));
+            $command = [...$this->airlockCommand, 'network-relay', self::PROXY_SOCKET, (string) self::RELAY_PORT, '--', ...$command];
         }
         // --new-session: a command must not reach the terminal Airlock runs in (TIOCSTI).
         array_push($arguments, '--die-with-parent', '--new-session', '--chdir', $projectDirectory, '--', ...$command);
@@ -77,9 +97,21 @@ final readonly class Bubblewrap implements Sandbox
     }
 
     #[\Override]
+    public function network(): NetworkAccess
+    {
+        return $this->network;
+    }
+
+    #[\Override]
     public function cutsNetwork(): bool
     {
-        return $this->cutsNetwork;
+        return NetworkAccess::None === $this->network;
+    }
+
+    #[\Override]
+    public function proxyListenAddress(string $privateDirectory): ListenAddress
+    {
+        return ListenAddress::fromOption('unix://'.$privateDirectory.'/proxy.sock');
     }
 
     #[\Override]
@@ -87,8 +119,28 @@ final readonly class Bubblewrap implements Sandbox
     {
         return \sprintf(
             'Sandbox (bubblewrap): writes only to the project and package caches, with a private /tmp; your keys and agents are out of reach%s.',
-            $this->cutsNetwork ? '; no network' : '',
+            NetworkDescription::of($this->network),
         );
+    }
+
+    /**
+     * The proxy's socket bound into the private /tmp, and the variables that send the tools to the relay in front of it.
+     *
+     * @return list<string>
+     */
+    private function proxyRoute(ProxyEndpoint $registriesProxy): array
+    {
+        if (null === $registriesProxy->socketFile) {
+            throw new \LogicException('bubblewrap reaches the registries proxy through its socket file, and it announced none.');
+        }
+        $arguments = ['--bind', $registriesProxy->socketFile, self::PROXY_SOCKET];
+        foreach (ProxyEndpoint::variablesFor(self::RELAY_PORT) as $name => $value) {
+            $arguments[] = '--setenv';
+            $arguments[] = $name;
+            $arguments[] = $value;
+        }
+
+        return $arguments;
     }
 
     /**

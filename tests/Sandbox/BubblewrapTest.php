@@ -544,6 +544,38 @@ final class BubblewrapTest extends TestCase
         return trim($process->getOutput());
     }
 
+    public function testLimitedToTheRegistriesAHostOffTheListIsBlockedAndNamed(): void
+    {
+        $result = $this->runInSandbox('curl -sS --max-time 10 https://evil.example/; echo "exit $?"', SandboxMode::Registries);
+
+        self::assertStringContainsString('CONNECT tunnel failed, response 403', $result->output);
+        self::assertStringContainsString('exit 56', $result->output);
+        self::assertSame(['evil.example:443'], $result->blockedConnections);
+    }
+
+    public function testLimitedToTheRegistriesNothingIsReachableAroundTheProxy(): void
+    {
+        $result = $this->runInSandbox("curl -sS --noproxy '*' --max-time 5 http://151.101.0.1/; echo \"exit $?\"", SandboxMode::Registries);
+
+        self::assertMatchesRegularExpression('/exit (6|7|28)\b/', $result->output, 'Without the proxy, the command has no route out: '.$result->output);
+        self::assertSame([], $result->blockedConnections);
+    }
+
+    public function testLimitedToTheRegistriesTheCommandsExitCodeAndOutputComeBack(): void
+    {
+        $result = $this->runInSandbox('echo "proxy: $HTTPS_PROXY"; echo out; echo err >&2; exit 3', SandboxMode::Registries);
+
+        self::assertSame(3, $result->exitCode);
+        self::assertStringContainsString("proxy: http://127.0.0.1:3128\nout\nerr\n", $result->output);
+    }
+
+    public function testLimitedToTheRegistriesACommandsOwnLocalServerStaysReachable(): void
+    {
+        $result = $this->runInSandbox('php -S 127.0.0.1:8099 -t . >/dev/null 2>&1 & sleep 0.5; curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:8099/missing; kill %1', SandboxMode::Registries);
+
+        self::assertSame('404', trim($result->output));
+    }
+
     private function runInSandbox(string $commandLine, SandboxMode $mode = SandboxMode::Auto, int $timeoutSeconds = 30, ?string $project = null, ?string $sshAgentSocket = null): CommandResult
     {
         return $this->runner($mode, $timeoutSeconds, $project, $sshAgentSocket)->run($commandLine);

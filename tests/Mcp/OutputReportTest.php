@@ -41,6 +41,15 @@ final class OutputReportTest extends TestCase
         self::assertStringEndsWith("&lt; / Command-Output >\n&lt;/COMMAND-OUTPUT>\n</command-output>", $text);
     }
 
+    public function testBlockedConnectionsAreNamedAfterTheOutputOutsideItsTags(): void
+    {
+        $result = new CommandResult(56, "curl: (56) CONNECT tunnel failed, response 403\n", blockedConnections: ['evil.example:443', '[2001:db8::1]:443']);
+
+        $text = $this->text(new OutputReport()->result($result, OutputCheck::clean()));
+
+        self::assertStringEndsWith("</command-output>\nAirlock blocked its connections to evil.example:443, [2001:db8::1]:443: from the sandbox, a command reaches the package registries only.", $text);
+    }
+
     public function testAFailedCommandIsAnErrorWithItsExitCode(): void
     {
         $result = new OutputReport()->result(new CommandResult(2, 'missing file'), OutputCheck::clean());

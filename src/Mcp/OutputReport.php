@@ -26,6 +26,12 @@ final readonly class OutputReport
         $lines = $check->isInjection() ? [self::FLAGGED] : [];
         $lines[] = $this->header($result, $check);
         $lines[] = $this->wrapped($result);
+        if ([] !== $result->blockedConnections) {
+            $lines[] = \sprintf(
+                'Airlock blocked its connections to %s: from the sandbox, a command reaches the package registries only.',
+                implode(', ', $result->blockedConnections),
+            );
+        }
         $content = [new TextContent(implode("\n", $lines))];
 
         return $result->isSuccessful() ? CallToolResult::success($content) : CallToolResult::error($content);
