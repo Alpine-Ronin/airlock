@@ -131,10 +131,13 @@ finds no route and fails: closed, never open.
 (`needsSshAgent`): they need their own host, over SSH as often as HTTPS. They
 run with the network open, as under `open`. `git push` is asked every time;
 the others name their remote in the command line or in `.git/config`, which
-the sandbox keeps read-only.
+the sandbox keeps read-only. The open network reaches the whole line, so a line
+joining a remote to anything but a plain `cd` (`git remote -v; php job.php`) is
+asked about even when grants cover each part: two grants given apart must not
+add up to an open network for a script.
 
-**Local services.** Under `auto` today, tests reach a database on the user's
-machine (`localhost:5432`). They no longer can. `network.yaml` lists local
+**Local services.** Under the old `auto`, tests reached a database on the
+user's machine (`localhost:5432`). Under the new one they do not, by default. `network.yaml` lists local
 ports (`local: [5432, 6379]`): on Linux the bridge listens on each one
 inside and relays it, through the proxy, to the same port outside; on macOS
 the profile allows each one.
