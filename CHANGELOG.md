@@ -3,6 +3,24 @@
 What changed in each release, newest first. Versions follow [semantic versioning](https://semver.org): until 1.0, a
 minor version may change the configuration and file formats.
 
+## 0.6.0 (2026-11-11)
+
+### Changed
+
+- `AIRLOCK_SANDBOX=auto`, the default, now lets a sandboxed command reach only the package registries (Packagist,
+  npm, PyPI, crates.io, Go, RubyGems, GitHub downloads) and the hosts `network.yaml` allows. Before, it reached any
+  host. A command reaching a git or SSH remote still reaches any host; a redirection on such a command is asked about,
+  whatever the grants. `AIRLOCK_SANDBOX=open` is what `auto` did before, and `airlock doctor` warns under it;
+  `registries` is another name for `auto`. `docs/network.md` explains the design (#74, #75, #77, #78).
+
+### Added
+
+- A connection the sandbox blocks is named to the agent after the output, as data between `<blocked-hosts>` tags, and
+  recorded in the audit log under `blocked_connections` (#75).
+- `network.yaml` in the configuration directory, for every project or one: `allow:` adds hosts, `local:` opens ports
+  on this machine, such as a database the tests use. Policy files gain `refuse_hosts:`, which removes a host, the
+  registries included; a committed `.airlock.yaml` can remove hosts but never add one (#76).
+
 ## 0.5.0 (2026-11-07)
 
 ### Added
