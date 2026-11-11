@@ -357,7 +357,7 @@ Airlock's own files live in `~/.config/airlock/` (or `$XDG_CONFIG_HOME/airlock/`
 | File | What it holds |
 |---|---|
 | `models.yaml` | What `airlock configure` set up: the model API, its key, the models |
-| `policy.yaml` | Commands and hosts you refuse everywhere |
+| `policy.yaml` | Commands and hosts you refuse everywhere ([every file's format](docs/formats.md)) |
 | `projects/<name>-<hash>/policy.yaml` | Commands and hosts you refuse in one project |
 | `network.yaml` | Hosts and local ports commands may reach besides the package registries, everywhere |
 | `projects/<name>-<hash>/network.yaml` | The same, in one project |
