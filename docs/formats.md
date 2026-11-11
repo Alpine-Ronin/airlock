@@ -52,15 +52,15 @@ refuse_hosts:
   entry's words; the program is compared by its base name (`/usr/bin/rm` is `rm`), also behind a wrapper such as
   `timeout` or `env`.
 - A `refuse_hosts` entry is a host name, compared exactly; no wildcard. It holds where the network goes through
-  Airlock's proxy: not under `AIRLOCK_SANDBOX=open` or `off`, nor for a command reaching a git or SSH remote, which
-  reach any host.
+  Airlock's proxy, under `AIRLOCK_SANDBOX=auto` (or `registries`): not under `open` or `off`, which reach any host,
+  nor for a command there reaching a git or SSH remote, which reaches any host too. Under `strict` nothing is reached.
 - Both keys are optional; an empty file refuses nothing.
 
 ## Network: `network.yaml`
 
 Only the user's own files: a project's `.airlock.yaml` can remove hosts (`refuse_hosts`), never add one. Read under
-`AIRLOCK_SANDBOX=auto` only: under `open` and `off`, and for a command reaching a git or SSH remote, every host is
-reachable.
+`AIRLOCK_SANDBOX=auto` (or `registries`) only, where a command reaching a git or SSH remote still reaches any host.
+Under `open` and `off` every host is reachable; under `strict`, none.
 
 ```yaml
 allow:
