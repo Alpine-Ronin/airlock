@@ -152,7 +152,7 @@ written under a `symfony/lock` lock: two agents can share one Airlock.
 
 Done: the parser, the policy, both sandboxes, the form and its grants, the
 audit log, rotated past a size, the model checks, `airlock connect` for five
-clients, four of them run end to end, grants and recent decisions from the
+clients, all five run end to end, grants and recent decisions from the
 terminal (`airlock grants`, `airlock log`), `airlock doctor`, and a static
 binary per platform, and reading a pull request's checks and comments for the
 agent (`github_pr_checks`, `github_pr_comments`): Airlock runs the user's `gh`
@@ -167,7 +167,6 @@ are the user's.
 
 Next, in this order:
 
-- Cursor runs end to end, as the others were.
 - A signed and notarized macOS binary, so that Gatekeeper opens it without a
   warning. Releases already prove where they come from: each binary is attested
   with its build provenance and an SBOM.

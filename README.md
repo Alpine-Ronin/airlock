@@ -187,7 +187,7 @@ without Airlock.
 |---|---|---|---|
 | Claude Code | `claude-code` | `.mcp.json`, `.claude/settings.local.json`; with `--scope user`, `~/.claude.json`, `~/.claude/settings.json` | Denied: `Bash` and `Monitor` |
 | Codex | `codex` | `~/.codex/config.toml`, or in `$CODEX_HOME` | Off: `shell_tool = false` |
-| Cursor | `cursor` | `.cursor/mcp.json` | Turn its terminal tool off in Cursor's agent settings |
+| Cursor | `cursor` | `.cursor/mcp.json` | Cannot be turned off: in Cursor Settings, Agents, set Run Mode to Allowlist with an empty Shell allowlist, so Cursor asks before its own commands |
 | VS Code | `vscode` | `.vscode/mcp.json`, `.github/agents/airlock.agent.md` | None in the `airlock` agent: pick it in the chat. VS Code's other agents keep theirs |
 | Goose | `goose` | `~/.config/goose/config.yaml` | The developer extension keeps `write`, `edit` and `tree` |
 
@@ -216,7 +216,7 @@ with only once or refuse, the audit resource read.
 | Claude Code | End to end | Airlock's form opens in the client; long messages are folded (`ctrl+o` unfolds them). |
 | Codex | End to end, 0.166 | Codex asks first whether Airlock's tool may run, then Airlock's form opens. A command allowed *always* runs without asking after a restart; asked to run a command without Airlock, the agent has no shell to do it. |
 | Goose | End to end, 1.57 | The form shows the choices by their values (`once`, `session`, `always`, `refuse`). Asked to run a command without Airlock, the agent finds no shell, even after turning the developer extension off and on. |
-| Cursor | Not yet | `connect` follows its documented format. |
+| Cursor | End to end, 3.29 | Airlock's form opens in the agent chat, its line breaks dropped. Cursor's own terminal stays: with Run Mode on Allowlist, Cursor asks before running a command itself. |
 | Cursor CLI (`cursor-agent`) | Does not work, 2026.11.05 | It declines every form without showing it, so Airlock refuses every command no grant covers. `connect cursor` writes the file it reads; deny its own shell with `Shell(*)` in `.cursor/cli.json`. |
 | VS Code | End to end, 1.145 | Pick the `airlock` agent in the chat. VS Code asks first whether Airlock's tool may run, then Airlock's form opens. The agent cannot read `airlock://audit` itself: open it with *MCP: Browse Resources*. |
 

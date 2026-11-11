@@ -3,6 +3,13 @@
 What changed in each release, newest first. Versions follow [semantic versioning](https://semver.org): until 1.0, a
 minor version may change the configuration and file formats.
 
+## Unreleased
+
+### Changed
+
+- Cursor 3.29 runs end to end. Its own terminal cannot be turned off, so `airlock connect cursor` now says how to have
+  Cursor ask first: Run Mode on Allowlist, with an empty Shell allowlist.
+
 ## 0.6.0 (2026-11-11)
 
 ### Changed

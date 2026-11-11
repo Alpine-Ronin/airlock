@@ -203,6 +203,17 @@ final class ConnectCommandTest extends KernelTestCase
         self::assertStringContainsString('sets mcpServers.airlock', $tester->getDisplay());
     }
 
+    public function testConnectingCursorSaysHowToHaveItAskBeforeItsOwnCommands(): void
+    {
+        $tester = $this->tester();
+
+        $tester->execute(['client' => 'cursor']);
+
+        $display = preg_replace('/\s+!?\s*/', ' ', $tester->getDisplay());
+        self::assertIsString($display);
+        self::assertStringContainsString('set Run Mode to Allowlist and leave its Shell allowlist empty', $display);
+    }
+
     public function testTheFileAsItWasIsKeptOutOfReachAndReadableByItsOwnerOnly(): void
     {
         $original = '{"oauthAccount": {"emailAddress": "you@example.test"}}';
