@@ -46,7 +46,7 @@ refuse_hosts:
 | Key | Type | Meaning |
 |---|---|---|
 | `refuse` | list of non-empty strings | Command lines that never run, and are not asked about |
-| `refuse_hosts` | list of non-empty strings | Host names a sandboxed command never reaches, on any port, registries included |
+| `refuse_hosts` | list of non-empty strings | Host names Airlock's proxy never lets a command reach, on any port, registries included; see the exceptions below |
 
 - A `refuse` entry is read as a shell reads it, into words. A part of a line is refused when its words start with the
   entry's words; the program is compared by its base name (`/usr/bin/rm` is `rm`), also behind a wrapper such as
