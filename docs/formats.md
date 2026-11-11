@@ -10,7 +10,8 @@ with a file it cannot read.
 ## Where they are
 
 Airlock's directory is `$XDG_CONFIG_HOME/airlock`, or `~/.config/airlock` when that variable is not set. It is open to
-its owner only, and out of every command's reach.
+its owner only, and out of a sandboxed command's reach. Without a sandbox (`AIRLOCK_SANDBOX=off`, no bubblewrap, or a
+project overlapping that directory), a command the user allows can read and change these files, grants included.
 
 | File | Written by | Read by |
 |---|---|---|
@@ -50,12 +51,16 @@ refuse_hosts:
 - A `refuse` entry is read as a shell reads it, into words. A part of a line is refused when its words start with the
   entry's words; the program is compared by its base name (`/usr/bin/rm` is `rm`), also behind a wrapper such as
   `timeout` or `env`.
-- A `refuse_hosts` entry is a host name, compared exactly; no wildcard.
+- A `refuse_hosts` entry is a host name, compared exactly; no wildcard. It holds where the network goes through
+  Airlock's proxy: not under `AIRLOCK_SANDBOX=open` or `off`, nor for a command reaching a git or SSH remote, which
+  reach any host.
 - Both keys are optional; an empty file refuses nothing.
 
 ## Network: `network.yaml`
 
-Only the user's own files: a project's `.airlock.yaml` can remove hosts (`refuse_hosts`), never add one.
+Only the user's own files: a project's `.airlock.yaml` can remove hosts (`refuse_hosts`), never add one. Read under
+`AIRLOCK_SANDBOX=auto` only: under `open` and `off`, and for a command reaching a git or SSH remote, every host is
+reachable.
 
 ```yaml
 allow:
@@ -127,7 +132,8 @@ Every key is written on every line, `null` when it does not apply.
 
 Written by `airlock configure`, readable by its owner only, since it holds the API key. Keys: `base_url`, `api_key`,
 `output_check_model`, `risk_model`, each a string. The variables `AIRLOCK_AI_BASE_URL`, `AIRLOCK_AI_API_KEY`,
-`AIRLOCK_OUTPUT_CHECK_MODEL` and `AIRLOCK_RISK_MODEL` win over it.
+`AIRLOCK_OUTPUT_CHECK_MODEL` and `AIRLOCK_RISK_MODEL` win over it when they are not empty: an empty one does not clear
+the file's setting.
 
 ## A file Airlock cannot read
 
@@ -137,6 +143,7 @@ Written by `airlock configure`, readable by its owner only, since it holds the A
 | `network.yaml` | the command stops, with the reason | refused the same way |
 | `grants.yaml` | Airlock stops and names the file; it never guesses | ignored when read, and dropped the next time Airlock writes the file |
 | `audit.jsonl` | a line it cannot read is skipped by `airlock log` | ignored |
+| `models.yaml` | the model checks stay off, with a warning in the log, unless the environment sets them | ignored |
 
 A policy fails closed on purpose: a refusal Airlock cannot read must not become a command it runs.
 
