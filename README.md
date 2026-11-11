@@ -52,6 +52,30 @@ the body; you allow it once or refuse, and no grant covers it. On GitHub
 Enterprise, log in with `gh auth login --hostname <host>`: Airlock does not pass on `GH_ENTERPRISE_TOKEN`, which gh
 would send to whatever host the repository names.
 
+## Built with Symfony AI and the PHP MCP SDK
+
+- **The MCP server is the MCP bundle** (`symfony/mcp-bundle`, on the PHP SDK `mcp/sdk`): tools and the audit resource
+  are classes in `src/Mcp`, served over stdio only.
+- **Elicitation is the permission system.** A command that needs your answer returns an MCP 2026-07-28
+  `input_required` result carrying a form; the SDK turns it into a classic `elicitation/create` for clients that only
+  speak 2025-11-25. The request state that rides along with the retry comes back through the client, so the bundle
+  signs it, and Airlock binds it to the exact command and to a one-use token: an answer for `make test` cannot be
+  replayed to run anything else.
+- **A model reads the output as data.** `symfony/ai-platform` and its generic bridge call any API that speaks OpenAI's
+  chat completions, configured through the AI bundle, with structured output: the model answers a field, `clean` or
+  `injection`, not prose to parse. A second call says in one line what a risky command would do. Neither decides
+  anything: both are optional, and nothing about running a command depends on them.
+
+## Documentation
+
+| Document | What it covers |
+|---|---|
+| [design.md](docs/design.md) | The problem, what happens to a command, the protocol, what Symfony AI does, what is not in scope |
+| [architecture.md](docs/architecture.md) | The modules of `src/`, the path of one `run_command` call through them, where the tests live |
+| [decisions.md](docs/decisions.md) | Each technical and functional decision: why, and what was rejected |
+| [network.md](docs/network.md) | The registries-only network: the proxy, the hosts, what it does not stop |
+| [formats.md](docs/formats.md) | The policy, network, grants, audit and models files |
+
 ## Quick start: five minutes
 
 Two steps: [install Airlock](#1-install-airlock), one of three ways, then [connect your MCP
