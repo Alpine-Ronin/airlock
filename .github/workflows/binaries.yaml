@@ -131,13 +131,9 @@ jobs:
                   cat buildroot/bin/micro.sfx build/airlock.phar > "airlock-${{ matrix.target }}"
                   chmod +x "airlock-${{ matrix.target }}"
 
-            # Ubuntu 24.04's AppArmor forbids unprivileged user namespaces, which bubblewrap needs.
             - name: Install bubblewrap
               if: runner.os == 'Linux'
-              run: |
-                  sudo apt-get update
-                  sudo apt-get install -y bubblewrap
-                  sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+              run: .github/scripts/install-bubblewrap.sh
 
             - name: Run one command through the binary, as a client would
               run: cd "$(mktemp -d)" && python3 "$GITHUB_WORKSPACE/.github/scripts/smoke.py" -- "$GITHUB_WORKSPACE/airlock-${{ matrix.target }}" mcp:server
