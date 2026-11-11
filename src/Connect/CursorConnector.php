@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Connect;
 
 /**
- * Cursor: the server in the project's `.cursor/mcp.json`. No file turns off Cursor's own terminal tool.
+ * Cursor: the server in the project's `.cursor/mcp.json`. Cursor's own terminal cannot be turned off, by a file or a setting.
  */
 final readonly class CursorConnector implements ClientConnector
 {
@@ -37,7 +37,7 @@ final readonly class CursorConnector implements ClientConnector
     public function notes(Scope $scope): array
     {
         return [
-            'Cursor\'s own terminal tool is still on: turn it off in Cursor\'s agent settings, or the agent can run commands without Airlock.',
+            'Cursor\'s own terminal cannot be turned off: in Cursor Settings, Agents, set Run Mode to Allowlist and leave its Shell allowlist empty, so that Cursor asks you before any command that does not go through Airlock.',
             '.cursor/mcp.json holds this machine\'s paths: keep it out of version control.',
         ];
     }
