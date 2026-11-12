@@ -29,9 +29,10 @@ final readonly class GitHubCliAttestationCheck implements AttestationCheck
     #[\Override]
     public function check(string $binaryPath, string $tag): Attestation
     {
-        if (version_compare(ltrim($tag, 'v'), self::FIRST_ATTESTED_VERSION, '<') || !$this->isGitHubCliLoggedIn()) {
+        if (version_compare(ltrim($tag, 'v'), self::FIRST_ATTESTED_VERSION, '<') || !$this->hasGitHubCliLogin()) {
             return Attestation::NotChecked;
         }
+        $this->assertActiveLoginWorks();
 
         $identity = \sprintf('^%s@refs/tags/%s$', preg_quote(self::RELEASE_WORKFLOW), preg_quote($tag));
         $result = $this->runner->runGitHubCli(['attestation', 'verify', $binaryPath, '--hostname', 'github.com', '--repo', Releases::REPOSITORY, '--cert-identity-regex', $identity]);
@@ -42,9 +43,21 @@ final readonly class GitHubCliAttestationCheck implements AttestationCheck
         return Attestation::Verified;
     }
 
-    private function isGitHubCliLoggedIn(): bool
+    private function hasGitHubCliLogin(): bool
     {
         return null !== $this->executableFinder->find('gh')
-            && $this->runner->runGitHubCli(['auth', 'status', '--hostname', 'github.com'])->isSuccessful();
+            && $this->runner->runGitHubCli(['auth', 'token', '--hostname', 'github.com'])->isSuccessful();
+    }
+
+    /**
+     * Only the active account: gh auth status without --active fails when any other account of github.com has a
+     * problem, which must not pass for "not logged in" and skip the check. A GitHub CLI too old for --active (before
+     * 2.57.0) fails here too, and the update stops, as install.sh stops.
+     */
+    private function assertActiveLoginWorks(): void
+    {
+        if (!$this->runner->runGitHubCli(['auth', 'status', '--hostname', 'github.com', '--active'])->isSuccessful()) {
+            throw new UpdateFailedException('The GitHub CLI cannot check where the binary was built: its login to github.com does not work, or it is older than 2.57.0. Run gh auth login, or update gh, then run airlock update again.');
+        }
     }
 }
