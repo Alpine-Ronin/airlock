@@ -16,6 +16,7 @@ on:
 
 permissions:
     contents: read
+    attestations: read
 
 env:
     PHP_VERSION: '8.5'
@@ -185,6 +186,20 @@ jobs:
                   python3 "$GITHUB_WORKSPACE/.github/scripts/smoke.py" -- "$binary" mcp:server
                   "$binary" log | tee log.txt
                   grep -F 'allowed once' log.txt
+
+            # airlock update on a copy, from a real release: its checksum and attestation checked, then the copy replaced.
+            - name: Update a copy of the binary to a release
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              shell: bash
+              run: |
+                  copy="$(mktemp -d)/airlock"
+                  cp "$GITHUB_WORKSPACE/airlock-${{ matrix.target }}" "$copy"
+                  cd "$(mktemp -d)"
+                  "$copy" update 0.6.0 | tee update.txt
+                  grep -F 'to v0.6.0' update.txt
+                  if grep -F 'Not checked where it was built' update.txt; then exit 1; fi
+                  "$copy" --version | grep -F 'v0.6.0'
 
             - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
               with:
