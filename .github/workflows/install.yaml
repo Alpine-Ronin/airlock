@@ -2,7 +2,7 @@ name: install
 
 # install.sh, run as a user runs it, against a release served locally: the platform is detected, a version is picked,
 # and a binary that does not match SHA256SUMS, or that the GitHub CLI finds no attestation for, is refused. Then against
-# a real release, whose attestation it checks.
+# a real release, whose attestation it checks. A first install is counted, once; an update is not.
 on:
     pull_request:
         paths:
@@ -33,23 +33,47 @@ jobs:
               if: runner.os == 'Linux'
               run: shellcheck -s sh install.sh
 
-            - name: Serve a fake release, latest and v1.0.0
+            - name: Serve a fake release, latest and v1.0.0, and the installs counter
               run: |
-                  mkdir -p releases/latest/download releases/download/v1.0.0
+                  mkdir -p releases/latest/download releases/download/v1.0.0 releases/download/installs
+                  echo counted > releases/download/installs/first-install.txt
                   for target in linux-x86_64 linux-aarch64 macos-aarch64; do
                       echo latest > "releases/latest/download/airlock-$target"
                       echo one > "releases/download/v1.0.0/airlock-$target"
                   done
                   (cd releases/latest/download && shasum -a 256 airlock-* > SHA256SUMS)
                   (cd releases/download/v1.0.0 && shasum -a 256 airlock-* > SHA256SUMS)
-                  (cd releases && python3 -m http.server 8765 --bind 127.0.0.1 > /dev/null 2>&1 &)
+                  (cd releases && python3 -m http.server 8765 --bind 127.0.0.1 > /dev/null 2> "$GITHUB_WORKSPACE/server.log" &)
                   sleep 1
 
-            - name: Install the latest release, piped into sh
-              run: sh < install.sh && test "$(cat installed/airlock)" = latest && test -x installed/airlock
+            - name: Install the latest release, piped into sh, counted as a first install
+              run: |
+                  sh < install.sh | tee install.log
+                  test "$(cat installed/airlock)" = latest && test -x installed/airlock
+                  grep -q '^Counted as a first install' install.log
+                  test "$(grep -c 'GET /download/installs/first-install.txt' server.log)" = 1
 
-            - name: Install a given version
-              run: sh -s -- 1.0.0 < install.sh && test "$(cat installed/airlock)" = one
+            - name: Install a given version over it, not counted
+              run: |
+                  sh -s -- 1.0.0 < install.sh && test "$(cat installed/airlock)" = one
+                  test "$(grep -c 'GET /download/installs/first-install.txt' server.log)" = 1
+
+            - name: Install elsewhere with AIRLOCK_NO_COUNT=1, not counted
+              env:
+                  AIRLOCK_INSTALL_DIR: ${{ github.workspace }}/uncounted
+                  AIRLOCK_NO_COUNT: '1'
+              run: |
+                  sh install.sh && test "$(cat uncounted/airlock)" = latest
+                  test "$(grep -c 'GET /download/installs/first-install.txt' server.log)" = 1
+
+            - name: Install even when the counter cannot be reached
+              env:
+                  AIRLOCK_INSTALL_DIR: ${{ github.workspace }}/no-counter
+              run: |
+                  rm releases/download/installs/first-install.txt
+                  sh install.sh | tee install.log
+                  test "$(cat no-counter/airlock)" = latest
+                  if grep -q '^Counted' install.log; then exit 1; fi
 
             - name: Refuse a binary with no attestation, when the GitHub CLI can check it
               env:
@@ -71,6 +95,7 @@ jobs:
               env:
                   GH_TOKEN: ${{ github.token }}
                   AIRLOCK_RELEASES_URL: ''
+                  AIRLOCK_NO_COUNT: '1'
               shell: bash
               run: |
                   sh install.sh 0.3.4 | tee install.log

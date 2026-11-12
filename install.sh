@@ -6,13 +6,16 @@
 #   curl -fsSL https://raw.githubusercontent.com/hbenabdallah/airlock/main/install.sh | sh
 #   curl -fsSL https://raw.githubusercontent.com/hbenabdallah/airlock/main/install.sh | sh -s -- 1.0.0
 #
-# AIRLOCK_INSTALL_DIR picks where it goes (default: ~/.local/bin).
+# AIRLOCK_INSTALL_DIR picks where it goes (default: ~/.local/bin). A first install, with no airlock there yet, also
+# downloads one small file from the project's "installs" release, so that its download count says how many people
+# installed Airlock; AIRLOCK_NO_COUNT=1 skips it.
 set -eu
 
 releases="${AIRLOCK_RELEASES_URL:-https://github.com/hbenabdallah/airlock/releases}"
 repository=hbenabdallah/airlock
 release_workflow="https://github.com/$repository/.github/workflows/binaries.yaml"
 install_dir="${AIRLOCK_INSTALL_DIR:-$HOME/.local/bin}"
+count_url="$releases/download/installs/first-install.txt"
 
 fail() {
     printf 'airlock: %s\n' "$1" >&2
@@ -131,10 +134,20 @@ expected="$(awk -v name="$binary" '$2 == name || $2 == "*" name { print $1 }' "$
 [ "$(sha256 "$work/$binary")" = "$expected" ] || fail "$binary does not match its checksum: not installed"
 verify_attestation "$work/$binary"
 
+is_first_install=false
+[ -e "$install_dir/airlock" ] || is_first_install=true
+
 mkdir -p "$install_dir"
 chmod +x "$work/$binary"
 mv "$work/$binary" "$install_dir/airlock"
 printf 'Installed %s\n' "$install_dir/airlock"
+
+if [ "$is_first_install" = true ] && [ "${AIRLOCK_NO_COUNT:-}" != 1 ]; then
+    # Counting is a courtesy to the project: when it cannot be reached, the install has still succeeded.
+    if download "$count_url" "$work/first-install.txt" 2> /dev/null; then
+        printf 'Counted as a first install: one download of %s (AIRLOCK_NO_COUNT=1 skips it).\n' "$count_url"
+    fi
+fi
 
 case ":$PATH:" in
     *":$install_dir:"*) ;;
