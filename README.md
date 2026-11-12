@@ -16,6 +16,7 @@
   <img src="https://img.shields.io/badge/Symfony-8.1-12161C?style=flat-square" alt="Symfony 8.1">
   <img src="https://img.shields.io/badge/MCP-2026--07--28-12161C?style=flat-square" alt="MCP 2026-07-28">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-E8930C?style=flat-square" alt="MIT license"></a>
+  <a href="#counting-installs"><img src="https://img.shields.io/github/downloads/hbenabdallah/airlock/installs/first-install.txt?label=installs&color=12161C&style=flat-square" alt="first installs"></a>
 </p>
 
 <p align="center">
@@ -103,6 +104,16 @@ A given version rather than the latest:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/hbenabdallah/airlock/main/install.sh | sh -s -- 0.1.0
 ```
+
+##### Counting installs
+
+On a first install, when no `airlock` is in the install directory yet, the script also downloads
+`first-install.txt` from the [`installs` release](https://github.com/hbenabdallah/airlock/releases/tag/installs), and
+says so. Its download count, the *installs* badge above, is how many people installed Airlock; an update or a
+reinstall over it is not counted. Nothing else is sent: GitHub counts the download, as it counts the binary's.
+`AIRLOCK_NO_COUNT=1` skips it. Each day the
+[installs workflow](https://github.com/hbenabdallah/airlock/actions/workflows/installs.yaml) writes that number and each
+release's binary downloads (updates and CI included) to its run summary.
 
 Or by hand: download `airlock-<platform>` and `SHA256SUMS` from the release, check that this prints the line
 `SHA256SUMS` has for it, then make it executable. On Linux, install bubblewrap as [below](#natively-with-php-85); macOS

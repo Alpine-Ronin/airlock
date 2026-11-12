@@ -12,6 +12,9 @@ minor version may change the configuration and file formats.
 
 ### Added
 
+- `install.sh` counts a first install, never an update: when no `airlock` is installed yet, it downloads one small file
+  from the `installs` release, whose download count the README shows. `AIRLOCK_NO_COUNT=1` skips it. A daily workflow
+  writes the counts to its summary.
 - `docs/formats.md` describes the files Airlock reads and writes: policy, network, grants and the audit log, and the
   questions left before 1.0 keeps them stable (#82).
 - The README says what Airlock is built with, Symfony AI and the PHP MCP SDK; `docs/architecture.md` describes its
