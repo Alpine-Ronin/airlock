@@ -22,7 +22,7 @@
 <p align="center">
   <a href="#quick-start-five-minutes">Quick start</a> ·
   <a href="#try-the-demo">Demo</a> ·
-  <a href="https://youtu.be/zLKRchke4pc">Video</a> ·
+  <a href="https://youtu.be/ve3vKHaWW2k">Video</a> ·
   <a href="#configuration">Configuration</a> ·
   <a href="docs/design.md">Design</a>
 </p>
