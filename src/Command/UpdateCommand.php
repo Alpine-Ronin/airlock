@@ -46,7 +46,7 @@ final class UpdateCommand extends Command
         }
         $binaryPath = $this->executable->binaryPath();
         if (null === $binaryPath) {
-            $io->error('This Airlock runs from a checkout, with PHP: update it with git pull, then composer install. With Docker, build the image again. airlock update replaces a binary installed by install.sh.');
+            $io->error('This Airlock runs from a checkout, with PHP: update it with git pull, then composer install. With Docker, git pull in the clone, then build the image again. airlock update replaces a binary installed by install.sh.');
 
             return Command::FAILURE;
         }
@@ -69,7 +69,7 @@ final class UpdateCommand extends Command
         if (Attestation::NotChecked === $update->attestation) {
             $io->note('Not checked where it was built: with the GitHub CLI installed and logged in, airlock update checks it.');
         }
-        $io->success(\sprintf('Updated %s from Airlock %s to %s. Restart your MCP client to use it.', $binaryPath, $update->fromVersion, $update->toVersion));
+        $io->success(\sprintf('Airlock %s is checked: putting it in place of %s (Airlock %s). Restart your MCP client to use it.', $update->toVersion, $binaryPath, $update->fromVersion));
 
         try {
             $this->replacer->replace($update->checkedBinary, $binaryPath);

@@ -56,7 +56,7 @@ download() {
 # Downloads URL and discards it, giving up within seconds: counting must never hold up an install.
 count() {
     if command -v curl > /dev/null 2>&1; then
-        curl -fsS --connect-timeout 5 --max-time 10 -o /dev/null "$1"
+        curl -fsSL --connect-timeout 5 --max-time 10 -o /dev/null "$1"
     else
         wget -q -T 10 -t 1 -O /dev/null "$1"
     fi

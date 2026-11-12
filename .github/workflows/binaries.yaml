@@ -197,7 +197,7 @@ jobs:
                   cp "$GITHUB_WORKSPACE/airlock-${{ matrix.target }}" "$copy"
                   cd "$(mktemp -d)"
                   "$copy" update 0.6.0 | tee update.txt
-                  grep -F 'to v0.6.0' update.txt
+                  grep -F 'Airlock v0.6.0 is checked' update.txt
                   if grep -F 'Not checked where it was built' update.txt; then exit 1; fi
                   "$copy" --version | grep -F 'v0.6.0'
 
