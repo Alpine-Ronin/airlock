@@ -7,6 +7,7 @@ namespace App\Command;
 use App\Connect\AirlockExecutable;
 use App\Update\Attestation;
 use App\Update\BinaryUpdater;
+use App\Update\RunningBinaryReplacer;
 use App\Update\UpdateFailedException;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -22,6 +23,7 @@ final class UpdateCommand extends Command
     public function __construct(
         private readonly BinaryUpdater $updater,
         private readonly AirlockExecutable $executable,
+        private readonly RunningBinaryReplacer $replacer,
     ) {
         parent::__construct();
     }
@@ -59,7 +61,7 @@ final class UpdateCommand extends Command
             return Command::FAILURE;
         }
 
-        if ($update->isAlreadyInstalled()) {
+        if (null === $update->checkedBinary) {
             $io->success(\sprintf('Airlock %s is installed already: %s.', $update->toVersion, $binaryPath));
 
             return Command::SUCCESS;
@@ -69,7 +71,13 @@ final class UpdateCommand extends Command
         }
         $io->success(\sprintf('Updated %s from Airlock %s to %s. Restart your MCP client to use it.', $binaryPath, $update->fromVersion, $update->toVersion));
 
-        return Command::SUCCESS;
+        try {
+            $this->replacer->replace($update->checkedBinary, $binaryPath);
+        } catch (UpdateFailedException $e) {
+            $io->error($e->getMessage());
+        }
+
+        return Command::FAILURE;
     }
 
     private function installedVersion(): string

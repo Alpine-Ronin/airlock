@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Update;
 
 /**
- * What airlock update did: the version it found installed, the one installed now, and whether its attestation was
- * checked.
+ * What airlock update found: the version installed, the one to install, whether its attestation was checked, and the
+ * checked binary waiting beside the installed one.
  */
 final readonly class Update
 {
@@ -14,16 +14,12 @@ final readonly class Update
         public string $fromVersion,
         public string $toVersion,
         public ?Attestation $attestation,
+        public ?string $checkedBinary,
     ) {
     }
 
     public static function alreadyInstalled(string $version): self
     {
-        return new self($version, $version, null);
-    }
-
-    public function isAlreadyInstalled(): bool
-    {
-        return !$this->attestation instanceof Attestation;
+        return new self($version, $version, null, null);
     }
 }

@@ -34,30 +34,32 @@ final class BinaryUpdaterTest extends TestCase
         $this->requestedUrls = [];
     }
 
-    public function testTheLatestReleaseReplacesTheBinary(): void
+    public function testTheLatestReleaseIsCheckedAndPutBesideTheBinary(): void
     {
         $update = $this->updater($this->release('v2.0.0', 'new'))->toLatest(self::BINARY, 'v1.0.0');
 
-        self::assertSame('new', file_get_contents(self::BINARY));
-        self::assertTrue(is_executable(self::BINARY));
         self::assertSame(['v1.0.0', 'v2.0.0', Attestation::Verified], [$update->fromVersion, $update->toVersion, $update->attestation]);
-        self::assertSame([self::BINARY], glob(self::ROOT.'/bin/{,.}*airlock*', \GLOB_BRACE), 'no temporary file is left');
+        self::assertNotNull($update->checkedBinary);
+        self::assertSame('new', file_get_contents($update->checkedBinary));
+        self::assertTrue(is_executable($update->checkedBinary));
+        self::assertSame(realpath(\dirname(self::BINARY)), \dirname($update->checkedBinary), 'beside the binary, so that a rename replaces it');
+        self::assertSame('old', file_get_contents(self::BINARY), 'the running binary is replaced only once nothing more of it runs');
     }
 
     public function testTheInstalledVersionIsNotDownloadedAgain(): void
     {
         $update = $this->updater($this->release('v1.0.0', 'new'))->toLatest(self::BINARY, 'v1.0.0');
 
-        self::assertTrue($update->isAlreadyInstalled());
-        self::assertSame('old', file_get_contents(self::BINARY));
+        self::assertNull($update->checkedBinary);
         self::assertSame(['https://api.github.com/repos/hbenabdallah/airlock/releases/latest'], $this->requestedUrls);
     }
 
     public function testAGivenVersionIsInstalledFromItsRelease(): void
     {
-        $this->updater($this->release('v0.9.0', 'older'))->toVersion(self::BINARY, 'v1.0.0', 'v0.9.0');
+        $update = $this->updater($this->release('v0.9.0', 'older'))->toVersion(self::BINARY, 'v1.0.0', 'v0.9.0');
 
-        self::assertSame('older', file_get_contents(self::BINARY));
+        self::assertNotNull($update->checkedBinary);
+        self::assertSame('older', file_get_contents($update->checkedBinary));
         self::assertNotContains('https://api.github.com/repos/hbenabdallah/airlock/releases/latest', $this->requestedUrls);
     }
 

@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Update;
 
 /**
- * Replaces the running Airlock binary with a release's, as install.sh installs it: the binary for this machine,
- * checked against the release's SHA256SUMS and, with the GitHub CLI logged in, its attestation. An update is never
- * counted as an install.
+ * Downloads a release's binary for this machine beside the running one, checked as install.sh checks it: against the
+ * release's SHA256SUMS and, with the GitHub CLI logged in, its attestation. RunningBinaryReplacer then puts it in place.
+ * An update is never counted as an install.
  */
 final readonly class BinaryUpdater
 {
@@ -46,14 +46,14 @@ final readonly class BinaryUpdater
             $this->releases->download($tag, $binary, $download);
             $this->assertMatchesChecksum($download, $binary, $tag);
             $attestation = $this->attestationCheck->check($download, $tag);
-            $this->replace($binaryPath, $download);
-        } finally {
-            if (is_file($download)) {
-                unlink($download);
-            }
+            $this->makeExecutable($download);
+        } catch (UpdateFailedException $e) {
+            unlink($download);
+
+            throw $e;
         }
 
-        return new Update($installedVersion, $tag, $attestation);
+        return new Update($installedVersion, $tag, $attestation, $download);
     }
 
     /**
@@ -111,14 +111,10 @@ final readonly class BinaryUpdater
         return null;
     }
 
-    /**
-     * A rename on the same filesystem: the binary is either the old one or the new one, and a running Airlock keeps
-     * the old one open until it exits.
-     */
-    private function replace(string $binaryPath, string $download): void
+    private function makeExecutable(string $download): void
     {
-        if (!chmod($download, 0o755) || !rename($download, $binaryPath)) {
-            throw new UpdateFailedException(\sprintf('Could not replace %s.', $binaryPath));
+        if (!chmod($download, 0o755)) {
+            throw new UpdateFailedException(\sprintf('Could not make %s executable.', $download));
         }
     }
 
