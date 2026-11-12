@@ -1,0 +1,29 @@
+name: installs
+
+# Each day, the number of first installs (downloads of first-install.txt, which install.sh fetches only when no airlock
+# is installed yet) and the binary downloads per release (first installs, updates and CI together), in the run's
+# summary. GitHub only keeps running totals: comparing two days' runs gives the trend.
+on:
+    schedule:
+        - cron: '17 6 * * *'
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+jobs:
+    count:
+        runs-on: ubuntu-24.04
+        steps:
+            - name: Write the counts to the summary
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  gh api --paginate "repos/$GITHUB_REPOSITORY/releases" --jq '.[]' > releases.jsonl
+                  first_installs="$(jq -s '[.[] | select(.tag_name == "installs") | .assets[] | select(.name == "first-install.txt") | .download_count] | add // 0' releases.jsonl)"
+                  {
+                      printf '## Installs on %s\n\n' "$(date -u +%F)"
+                      printf 'First installs, through install.sh: **%s**\n\n' "$first_installs"
+                      printf '| Release | Binary downloads (first installs, updates and CI) |\n| --- | --- |\n'
+                      jq -r 'select(.tag_name | startswith("v")) | "| \(.tag_name) | \([.assets[] | select(.name | startswith("airlock-")) | .download_count] | add // 0) |"' releases.jsonl
+                  } >> "$GITHUB_STEP_SUMMARY"
