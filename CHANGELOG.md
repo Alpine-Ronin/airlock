@@ -3,12 +3,19 @@
 What changed in each release, newest first. Versions follow [semantic versioning](https://semver.org): until 1.0, a
 minor version may change the configuration and file formats.
 
-## Unreleased
+## 0.6.1 (2026-11-12)
 
 ### Changed
 
 - Cursor 3.29 runs end to end. Its own terminal cannot be turned off, so `airlock connect cursor` now says how to have
-  Cursor ask first: Run Mode on Allowlist, with an empty Shell allowlist.
+  Cursor ask first: Run Mode on Allowlist, with an empty Shell allowlist (#81).
+
+### Added
+
+- `docs/formats.md` describes the files Airlock reads and writes: policy, network, grants and the audit log, and the questions left
+  before 1.0 keeps them stable (#82).
+- The README says what Airlock is built with, Symfony AI and the PHP MCP SDK; `docs/architecture.md` describes its
+  modules and the path of one command, `docs/decisions.md` its technical and functional decisions (#84).
 
 ## 0.6.0 (2026-11-11)
 
@@ -164,7 +171,7 @@ minor version may change the configuration and file formats.
 - A grant could cover a command line that bash runs differently from how Airlock read it: `ls -l }`, `ls -l\`,
   `ls -l ''2>&1`, `> out ! ls -l` and `'{' ls -l` all ran unasked under a grant for `ls -l`, and `''A=1 ls` was read
   as `ls` with a variable set, though bash runs a program named `A=1`. Airlock now reads grouping words, assignments,
-  a final backslash and quoted numbers before a redirection as bash does, and a test compares what it reads with what
+  a final backslash and quoted numbers before a redirection as bash does, and a test compares what it reads and the questions left
   bash runs over a thousand random lines on every run (#41).
 - Symfony is updated to 8.1.11, for the security fixes it published on 4 November 2026 (#41).
 
