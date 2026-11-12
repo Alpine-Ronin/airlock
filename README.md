@@ -105,6 +105,11 @@ A given version rather than the latest:
 curl -fsSL https://raw.githubusercontent.com/hbenabdallah/airlock/main/install.sh | sh -s -- 0.1.0
 ```
 
+To update a binary installed this way, run `airlock update`: it downloads the latest release's binary and checks it
+as the install script does, then replaces itself (`airlock update 0.6.0` installs a given version). An update is not
+counted as an install. Restart your MCP client afterwards. From a clone, update with `git pull` and `composer install`;
+with Docker, build the image again.
+
 ##### Counting installs
 
 On a first install, when no `airlock` is in the install directory yet, the script also downloads
