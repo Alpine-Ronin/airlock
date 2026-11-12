@@ -53,6 +53,15 @@ download() {
     fi
 }
 
+# Downloads URL and discards it, giving up within seconds: counting must never hold up an install.
+count() {
+    if command -v curl > /dev/null 2>&1; then
+        curl -fsS --connect-timeout 5 --max-time 10 -o /dev/null "$1"
+    else
+        wget -q -T 10 -t 1 -O /dev/null "$1"
+    fi
+}
+
 sha256() {
     if command -v sha256sum > /dev/null 2>&1; then
         sha256sum "$1" | cut -d ' ' -f 1
@@ -143,8 +152,7 @@ mv "$work/$binary" "$install_dir/airlock"
 printf 'Installed %s\n' "$install_dir/airlock"
 
 if [ "$is_first_install" = true ] && [ "${AIRLOCK_NO_COUNT:-}" != 1 ]; then
-    # Counting is a courtesy to the project: when it cannot be reached, the install has still succeeded.
-    if download "$count_url" "$work/first-install.txt" 2> /dev/null; then
+    if count "$count_url" 2> /dev/null; then
         printf 'Counted as a first install: one download of %s (AIRLOCK_NO_COUNT=1 skips it).\n' "$count_url"
     fi
 fi
