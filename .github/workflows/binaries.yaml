@@ -16,6 +16,7 @@ on:
 
 permissions:
     contents: read
+    attestations: read
 
 env:
     PHP_VERSION: '8.5'
@@ -186,6 +187,20 @@ jobs:
                   "$binary" log | tee log.txt
                   grep -F 'allowed once' log.txt
 
+            # airlock update on a copy, from a real release: its checksum and attestation checked, then the copy replaced.
+            - name: Update a copy of the binary to a release
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              shell: bash
+              run: |
+                  copy="$(mktemp -d)/airlock"
+                  cp "$GITHUB_WORKSPACE/airlock-${{ matrix.target }}" "$copy"
+                  cd "$(mktemp -d)"
+                  "$copy" update 0.6.0 | tee update.txt
+                  grep -F 'Airlock v0.6.0 is checked' update.txt
+                  if grep -F 'Not checked where it was built' update.txt; then exit 1; fi
+                  "$copy" --version | grep -F 'v0.6.0'
+
             - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
               with:
                   name: airlock-${{ matrix.target }}
@@ -224,7 +239,10 @@ jobs:
 
             - run: sha256sum airlock-* airlock.cdx.json > SHA256SUMS
 
+            # The notes start from the last version release: the "installs" release, which only counts installs, is none.
             - name: Publish the release
               env:
                   GH_TOKEN: ${{ github.token }}
-              run: gh release create "$GITHUB_REF_NAME" airlock-* airlock.cdx.json SHA256SUMS --repo "$GITHUB_REPOSITORY" --generate-notes
+              run: |
+                  previous="$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --exclude-pre-releases --limit 100 --json tagName --jq '[.[].tagName | select(startswith("v"))][0]')"
+                  gh release create "$GITHUB_REF_NAME" airlock-* airlock.cdx.json SHA256SUMS --repo "$GITHUB_REPOSITORY" --generate-notes --notes-start-tag "$previous"

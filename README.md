@@ -16,6 +16,7 @@
   <img src="https://img.shields.io/badge/Symfony-8.1-12161C?style=flat-square" alt="Symfony 8.1">
   <img src="https://img.shields.io/badge/MCP-2026--07--28-12161C?style=flat-square" alt="MCP 2026-07-28">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-E8930C?style=flat-square" alt="MIT license"></a>
+  <a href="#counting-installs"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.github.com%2Frepos%2Fhbenabdallah%2Fairlock%2Freleases%2Ftags%2Finstalls&query=%24.assets%5B0%5D.download_count&label=installs&color=12161C&style=flat-square" alt="first installs"></a>
 </p>
 
 <p align="center">
@@ -103,6 +104,21 @@ A given version rather than the latest:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/hbenabdallah/airlock/main/install.sh | sh -s -- 0.1.0
 ```
+
+To update a binary installed this way, run `airlock update`: it downloads the latest release's binary and checks it
+as the install script does, then replaces itself (`airlock update 0.6.0` installs a given version). An update is not
+counted as an install. Restart your MCP client afterwards. From a clone, update with `git pull` and `composer install`;
+with Docker, `git pull` in the clone, then build the image again.
+
+##### Counting installs
+
+On a first install, when no `airlock` is in the install directory yet, the script also downloads
+`first-install.txt` from the [`installs` release](https://github.com/hbenabdallah/airlock/releases/tag/installs), and
+says so. Its download count, the *installs* badge above, is how many people installed Airlock; an update or a
+reinstall over it is not counted. Nothing else is sent: GitHub counts the download, as it counts the binary's.
+`AIRLOCK_NO_COUNT=1` skips it. Each day the
+[installs workflow](https://github.com/hbenabdallah/airlock/actions/workflows/installs.yaml) writes that number and each
+release's binary downloads (updates and CI included) to its run summary.
 
 Or by hand: download `airlock-<platform>` and `SHA256SUMS` from the release, check that this prints the line
 `SHA256SUMS` has for it, then make it executable. On Linux, install bubblewrap as [below](#natively-with-php-85); macOS

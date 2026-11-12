@@ -6,13 +6,16 @@
 #   curl -fsSL https://raw.githubusercontent.com/hbenabdallah/airlock/main/install.sh | sh
 #   curl -fsSL https://raw.githubusercontent.com/hbenabdallah/airlock/main/install.sh | sh -s -- 1.0.0
 #
-# AIRLOCK_INSTALL_DIR picks where it goes (default: ~/.local/bin).
+# AIRLOCK_INSTALL_DIR picks where it goes (default: ~/.local/bin). A first install, with no airlock there yet, also
+# downloads one small file from the project's "installs" release, so that its download count says how many people
+# installed Airlock; AIRLOCK_NO_COUNT=1 skips it.
 set -eu
 
 releases="${AIRLOCK_RELEASES_URL:-https://github.com/hbenabdallah/airlock/releases}"
 repository=hbenabdallah/airlock
 release_workflow="https://github.com/$repository/.github/workflows/binaries.yaml"
 install_dir="${AIRLOCK_INSTALL_DIR:-$HOME/.local/bin}"
+count_url="$releases/download/installs/first-install.txt"
 
 fail() {
     printf 'airlock: %s\n' "$1" >&2
@@ -47,6 +50,15 @@ download() {
         wget -q -O "$2" "$1"
     else
         fail "curl or wget is needed to download Airlock"
+    fi
+}
+
+# Downloads URL and discards it, giving up within seconds: counting must never hold up an install.
+count() {
+    if command -v curl > /dev/null 2>&1; then
+        curl -fsSL --connect-timeout 5 --max-time 10 -o /dev/null "$1"
+    else
+        wget -q -T 10 -t 1 -O /dev/null "$1"
     fi
 }
 
@@ -131,10 +143,19 @@ expected="$(awk -v name="$binary" '$2 == name || $2 == "*" name { print $1 }' "$
 [ "$(sha256 "$work/$binary")" = "$expected" ] || fail "$binary does not match its checksum: not installed"
 verify_attestation "$work/$binary"
 
+is_first_install=false
+[ -e "$install_dir/airlock" ] || is_first_install=true
+
 mkdir -p "$install_dir"
 chmod +x "$work/$binary"
 mv "$work/$binary" "$install_dir/airlock"
 printf 'Installed %s\n' "$install_dir/airlock"
+
+if [ "$is_first_install" = true ] && [ "${AIRLOCK_NO_COUNT:-}" != 1 ]; then
+    if count "$count_url" 2> /dev/null; then
+        printf 'Counted as a first install: one download of %s (AIRLOCK_NO_COUNT=1 skips it).\n' "$count_url"
+    fi
+fi
 
 case ":$PATH:" in
     *":$install_dir:"*) ;;

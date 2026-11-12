@@ -12,6 +12,11 @@ minor version may change the configuration and file formats.
 
 ### Added
 
+- `airlock update` replaces a binary with the latest release, or a given version (`airlock update 0.6.0`), checked as
+  `install.sh` checks it: against the release's `SHA256SUMS` and, with the GitHub CLI logged in, its attestation.
+- `install.sh` counts a first install, never an update: when no `airlock` is installed yet, it downloads one small file
+  from the `installs` release, whose download count the README shows. `AIRLOCK_NO_COUNT=1` skips it. A daily workflow
+  writes the counts to its summary.
 - `docs/formats.md` describes the files Airlock reads and writes: policy, network, grants and the audit log, and the
   questions left before 1.0 keeps them stable (#82).
 - The README says what Airlock is built with, Symfony AI and the PHP MCP SDK; `docs/architecture.md` describes its
