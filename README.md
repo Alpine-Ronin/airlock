@@ -16,7 +16,7 @@
   <img src="https://img.shields.io/badge/Symfony-8.1-12161C?style=flat-square" alt="Symfony 8.1">
   <img src="https://img.shields.io/badge/MCP-2026--07--28-12161C?style=flat-square" alt="MCP 2026-07-28">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-E8930C?style=flat-square" alt="MIT license"></a>
-  <a href="#counting-installs"><img src="https://img.shields.io/github/downloads/hbenabdallah/airlock/installs/first-install.txt?label=installs&color=12161C&style=flat-square" alt="first installs"></a>
+  <a href="#counting-installs"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.github.com%2Frepos%2Fhbenabdallah%2Fairlock%2Freleases%2Ftags%2Finstalls&query=%24.assets%5B0%5D.download_count&label=installs&color=12161C&style=flat-square" alt="first installs"></a>
 </p>
 
 <p align="center">
