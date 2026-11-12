@@ -32,6 +32,16 @@ final readonly class AirlockExecutable
         return [\PHP_BINARY, $this->projectDirectory.'/bin/console', ...array_values($arguments)];
     }
 
+    /**
+     * The binary this Airlock runs as, or null when it runs from a checkout, with PHP.
+     */
+    public function binaryPath(): ?string
+    {
+        $archive = \extension_loaded('phar') ? \Phar::running(false) : '';
+
+        return '' === $archive ? null : $archive;
+    }
+
     public function serverCommand(): ServerCommand
     {
         $archive = \extension_loaded('phar') ? \Phar::running(false) : '';

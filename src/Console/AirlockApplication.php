@@ -16,7 +16,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 final class AirlockApplication extends Application
 {
     /** Airlock's commands, and the console's own ones a user needs. */
-    public const array LISTED_COMMANDS = ['configure', 'connect', 'doctor', 'grants', 'log', 'mcp:server', 'help', 'list', 'completion'];
+    public const array LISTED_COMMANDS = ['configure', 'connect', 'doctor', 'grants', 'log', 'mcp:server', 'update', 'help', 'list', 'completion'];
 
     /** Airlock's commands that Airlock runs itself, never the user: hidden like the framework's. */
     public const array INTERNAL_COMMANDS = ['network-proxy'];
@@ -51,6 +51,7 @@ final class AirlockApplication extends Application
               airlock log                   Show the last decisions Airlock made in this project
               airlock grants                List the commands allowed always here; --revoke <number> takes one back
               airlock grants --preset php   Allow a project's tests, linters and analysis always (also node, python)
+              airlock update                Replace this binary with the latest release, checked as install.sh does
               airlock help <command>        Show every option of a command
             HELP;
     }
