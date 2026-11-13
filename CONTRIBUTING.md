@@ -1,7 +1,7 @@
 # Contributing
 
 Thanks for helping. A vulnerability goes to [SECURITY.md](SECURITY.md), never to an issue. A bug, or a client that
-behaves differently from what the README says, goes to an [issue](https://github.com/hbenabdallah/airlock/issues/new/choose).
+behaves differently from what the README says, goes to an [issue](https://github.com/Alpine-Ronin/airlock/issues/new/choose).
 For a change bigger than a fix, open an issue first, so that we agree on it before you write it.
 
 ## Setting up
@@ -10,7 +10,7 @@ You need PHP 8.5 with the extensions `composer.json` requires, Composer, and on 
 (`sudo apt-get install -y bubblewrap`). Then:
 
 ```bash
-git clone https://github.com/hbenabdallah/airlock.git && cd airlock
+git clone https://github.com/Alpine-Ronin/airlock.git && cd airlock
 composer install
 composer check
 ```

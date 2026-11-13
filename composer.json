@@ -99,6 +99,6 @@
             "require": "8.1.*"
         }
     },
-    "name": "hbenabdallah/airlock",
+    "name": "alpine-ronin/airlock",
     "description": "An MCP server that lets any agent run commands in a sandbox, asking you first about the ones that matter"
 }

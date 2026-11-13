@@ -14,12 +14,14 @@ final class GitHubCliAttestationCheckTest extends KernelTestCase
 {
     private const string ROOT = __DIR__.'/../../var/test-attestation-check';
 
-    /** Logs each call to gh.log, and fails the calls whose first two words are listed in fail.txt. */
+    /** Logs each call to gh.log, and fails the calls that start with a line of fail.txt. */
     private const string FAKE_GH = <<<'BASH'
         #!/bin/bash
         directory="$(dirname "$0")"
         printf '%s\n' "$*" >> "$directory/gh.log"
-        if grep -qxF "$1 $2" "$directory/fail.txt"; then exit 1; fi
+        while IFS= read -r start; do
+            if [[ -n "$start" && "$*" == "$start"* ]]; then exit 1; fi
+        done < "$directory/fail.txt"
         BASH;
 
     private Filesystem $filesystem;
@@ -55,8 +57,19 @@ final class GitHubCliAttestationCheckTest extends KernelTestCase
         self::assertSame([
             'auth token --hostname github.com',
             'auth status --hostname github.com --active',
-            'attestation verify /tmp/airlock-new --hostname github.com --repo hbenabdallah/airlock --cert-identity-regex ^https\://github\.com/hbenabdallah/airlock/\.github/workflows/binaries\.yaml@refs/tags/v1\.2\.3$',
+            'attestation verify /tmp/airlock-new --hostname github.com --repo Alpine-Ronin/airlock --cert-identity-regex ^https\://github\.com/Alpine\-Ronin/airlock/\.github/workflows/binaries\.yaml@refs/tags/v1\.2\.3$',
         ], $this->ghCalls());
+    }
+
+    public function testABinaryBuiltBeforeTheMoveToTheOrganisationIsCheckedAsBuiltByTheFormerReleaseWorkflow(): void
+    {
+        $this->failing('attestation verify /tmp/airlock-new --hostname github.com --repo');
+
+        self::assertSame(Attestation::Verified, $this->check()->check('/tmp/airlock-new', 'v0.6.1'));
+        self::assertSame(
+            'attestation verify /tmp/airlock-new --hostname github.com --owner hbenabdallah --cert-identity-regex ^https\\://github\\.com/hbenabdallah/airlock/\\.github/workflows/binaries\\.yaml@refs/tags/v0\\.6\\.1$',
+            $this->ghCalls()[3],
+        );
     }
 
     public function testWithoutALoginTheBinaryIsNotChecked(): void

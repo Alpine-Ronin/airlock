@@ -3,17 +3,21 @@
 # release's SHA256SUMS and, with the GitHub CLI logged in, its attestation: that this repository's release workflow
 # built it, from the release's tag.
 #
-#   curl -fsSL https://raw.githubusercontent.com/hbenabdallah/airlock/main/install.sh | sh
-#   curl -fsSL https://raw.githubusercontent.com/hbenabdallah/airlock/main/install.sh | sh -s -- 1.0.0
+#   curl -fsSL https://raw.githubusercontent.com/Alpine-Ronin/airlock/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/Alpine-Ronin/airlock/main/install.sh | sh -s -- 1.0.0
 #
 # AIRLOCK_INSTALL_DIR picks where it goes (default: ~/.local/bin). A first install, with no airlock there yet, also
 # downloads one small file from the project's "installs" release, so that its download count says how many people
 # installed Airlock; AIRLOCK_NO_COUNT=1 skips it.
 set -eu
 
-releases="${AIRLOCK_RELEASES_URL:-https://github.com/hbenabdallah/airlock/releases}"
-repository=hbenabdallah/airlock
+releases="${AIRLOCK_RELEASES_URL:-https://github.com/Alpine-Ronin/airlock/releases}"
+repository=Alpine-Ronin/airlock
 release_workflow="https://github.com/$repository/.github/workflows/binaries.yaml"
+# Releases up to 0.6.1 were built when the repository was hbenabdallah/airlock: their attestations name that workflow
+# and stayed with that account when the repository moved to its organisation.
+former_owner=hbenabdallah
+former_release_workflow="https://github.com/$former_owner/airlock/.github/workflows/binaries.yaml"
 install_dir="${AIRLOCK_INSTALL_DIR:-$HOME/.local/bin}"
 count_url="$releases/download/installs/first-install.txt"
 
@@ -113,6 +117,7 @@ verify_attestation() {
     tag='v[0-9][^@]*'
     [ -z "$version" ] || tag="v$(printf '%s' "$version" | sed 's/\./\\./g')"
     gh attestation verify "$1" --hostname github.com --repo "$repository" --cert-identity-regex "^$(printf '%s' "$release_workflow" | sed 's/\./\\./g')@refs/tags/$tag\$" > /dev/null 2>&1 \
+        || gh attestation verify "$1" --hostname github.com --owner "$former_owner" --cert-identity-regex "^$(printf '%s' "$former_release_workflow" | sed 's/\./\\./g')@refs/tags/$tag\$" > /dev/null 2>&1 \
         || fail "$binary has no attestation that this repository's release workflow built it: not installed"
     printf 'Checked: %s was built by the release workflow of %s.\n' "$binary" "$repository"
 }
