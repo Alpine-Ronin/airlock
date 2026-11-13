@@ -17,6 +17,14 @@ final readonly class GitHubCliAttestationCheck implements AttestationCheck
 {
     private const string RELEASE_WORKFLOW = 'https://github.com/'.Releases::REPOSITORY.'/.github/workflows/binaries.yaml';
 
+    /**
+     * Releases up to 0.6.1 were built when the repository was hbenabdallah/airlock: their attestations name that
+     * workflow and stayed with that account when the repository moved to its organisation.
+     */
+    private const string FORMER_OWNER = 'hbenabdallah';
+
+    private const string FORMER_RELEASE_WORKFLOW = 'https://github.com/'.self::FORMER_OWNER.'/airlock/.github/workflows/binaries.yaml';
+
     /** The first release whose binaries are attested. */
     private const string FIRST_ATTESTED_VERSION = '0.3.4';
 
@@ -34,13 +42,23 @@ final readonly class GitHubCliAttestationCheck implements AttestationCheck
         }
         $this->assertActiveLoginWorks();
 
-        $identity = \sprintf('^%s@refs/tags/%s$', preg_quote(self::RELEASE_WORKFLOW), preg_quote($tag));
-        $result = $this->runner->runGitHubCli(['attestation', 'verify', $binaryPath, '--hostname', 'github.com', '--repo', Releases::REPOSITORY, '--cert-identity-regex', $identity]);
-        if (!$result->isSuccessful()) {
+        $isAttested = $this->isAttested($binaryPath, ['--repo', Releases::REPOSITORY], self::RELEASE_WORKFLOW, $tag)
+            || $this->isAttested($binaryPath, ['--owner', self::FORMER_OWNER], self::FORMER_RELEASE_WORKFLOW, $tag);
+        if (!$isAttested) {
             throw new UpdateFailedException(\sprintf('%s has no attestation that the release workflow of %s built it, from %s: not installed.', basename($binaryPath), Releases::REPOSITORY, $tag));
         }
 
         return Attestation::Verified;
+    }
+
+    /**
+     * @param list<string> $where the gh flag and value that say where the attestation is stored
+     */
+    private function isAttested(string $binaryPath, array $where, string $releaseWorkflow, string $tag): bool
+    {
+        $identity = \sprintf('^%s@refs/tags/%s$', preg_quote($releaseWorkflow), preg_quote($tag));
+
+        return $this->runner->runGitHubCli(['attestation', 'verify', $binaryPath, '--hostname', 'github.com', ...$where, '--cert-identity-regex', $identity])->isSuccessful();
     }
 
     private function hasGitHubCliLogin(): bool

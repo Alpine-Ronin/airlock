@@ -138,6 +138,8 @@ static PHP runtime and its extensions are not in the SBOM. With the [GitHub CLI]
 gh attestation verify airlock-<platform> --repo Alpine-Ronin/airlock --signer-workflow Alpine-Ronin/airlock/.github/workflows/binaries.yaml --source-ref refs/tags/v<version>
 ```
 
+Releases up to 0.6.1 were built before the repository moved to Alpine-Ronin: check them with
+`--owner hbenabdallah --signer-workflow hbenabdallah/airlock/.github/workflows/binaries.yaml` instead.
 The same command with `--predicate-type https://cyclonedx.org/bom` checks the SBOM attestation.
 
 The server command:
