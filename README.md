@@ -11,12 +11,12 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Alpine-Ronin/airlock/actions/workflows/check.yaml"><img src="https://github.com/Alpine-Ronin/airlock/actions/workflows/check.yaml/badge.svg" alt="check"></a>
+  <a href="https://github.com/alpine-ronin/airlock/actions/workflows/check.yaml"><img src="https://github.com/alpine-ronin/airlock/actions/workflows/check.yaml/badge.svg" alt="check"></a>
   <img src="https://img.shields.io/badge/PHP-8.5-12161C?style=flat-square" alt="PHP 8.5">
   <img src="https://img.shields.io/badge/Symfony-8.1-12161C?style=flat-square" alt="Symfony 8.1">
   <img src="https://img.shields.io/badge/MCP-2026--07--28-12161C?style=flat-square" alt="MCP 2026-07-28">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-E8930C?style=flat-square" alt="MIT license"></a>
-  <a href="#counting-installs"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.github.com%2Frepos%2FAlpine-Ronin%2Fairlock%2Freleases%2Ftags%2Finstalls&query=%24.assets%5B0%5D.download_count&label=installs&color=12161C&style=flat-square" alt="first installs"></a>
+  <a href="#counting-installs"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.github.com%2Frepos%2Falpine-ronin%2Fairlock%2Freleases%2Ftags%2Finstalls&query=%24.assets%5B0%5D.download_count&label=installs&color=12161C&style=flat-square" alt="first installs"></a>
 </p>
 
 <p align="center">
@@ -88,7 +88,7 @@ Each way ends with the command that starts the server. Your client runs it; you 
 
 #### With a binary (no PHP, no Docker)
 
-Each [release](https://github.com/Alpine-Ronin/airlock/releases) holds one executable per platform, PHP 8.5 included:
+Each [release](https://github.com/alpine-ronin/airlock/releases) holds one executable per platform, PHP 8.5 included:
 `airlock-macos-aarch64` (Apple Silicon), `airlock-linux-x86_64` and `airlock-linux-aarch64`, with their `SHA256SUMS`.
 The install script picks the one for this machine, checks it against `SHA256SUMS` and, when the
 [GitHub CLI](https://cli.github.com) is logged in, checks its attestation (see below; releases before 0.3.4 have none,
@@ -96,13 +96,13 @@ so theirs is not checked), then puts it in `~/.local/bin`
 (`AIRLOCK_INSTALL_DIR` to choose another directory). Read it first if you like: [install.sh](install.sh).
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Alpine-Ronin/airlock/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/alpine-ronin/airlock/main/install.sh | sh
 ```
 
 A given version rather than the latest:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Alpine-Ronin/airlock/main/install.sh | sh -s -- 0.1.0
+curl -fsSL https://raw.githubusercontent.com/alpine-ronin/airlock/main/install.sh | sh -s -- 0.1.0
 ```
 
 To update a binary installed this way, run `airlock update`: it downloads the latest release's binary and checks it
@@ -113,11 +113,11 @@ with Docker, `git pull` in the clone, then build the image again.
 ##### Counting installs
 
 On a first install, when no `airlock` is in the install directory yet, the script also downloads
-`first-install.txt` from the [`installs` release](https://github.com/Alpine-Ronin/airlock/releases/tag/installs), and
+`first-install.txt` from the [`installs` release](https://github.com/alpine-ronin/airlock/releases/tag/installs), and
 says so. Its download count, the *installs* badge above, is how many people installed Airlock; an update or a
 reinstall over it is not counted. Nothing else is sent: GitHub counts the download, as it counts the binary's.
 `AIRLOCK_NO_COUNT=1` skips it. Each day the
-[installs workflow](https://github.com/Alpine-Ronin/airlock/actions/workflows/installs.yaml) writes that number and each
+[installs workflow](https://github.com/alpine-ronin/airlock/actions/workflows/installs.yaml) writes that number and each
 release's binary downloads (updates and CI included) to its run summary.
 
 Or by hand: download `airlock-<platform>` and `SHA256SUMS` from the release, check that this prints the line
@@ -135,10 +135,10 @@ release workflow) and what it holds, the PHP packages listed in `airlock.cdx.jso
 static PHP runtime and its extensions are not in the SBOM. With the [GitHub CLI](https://cli.github.com):
 
 ```bash
-gh attestation verify airlock-<platform> --repo Alpine-Ronin/airlock --signer-workflow Alpine-Ronin/airlock/.github/workflows/binaries.yaml --source-ref refs/tags/v<version>
+gh attestation verify airlock-<platform> --repo alpine-ronin/airlock --signer-workflow alpine-ronin/airlock/.github/workflows/binaries.yaml --source-ref refs/tags/v<version>
 ```
 
-Releases up to 0.6.1 were built before the repository moved to Alpine-Ronin: check them with
+Releases up to 0.6.1 were built before the repository moved to Alpine Ronin: check them with
 `--owner hbenabdallah --signer-workflow hbenabdallah/airlock/.github/workflows/binaries.yaml` instead.
 The same command with `--predicate-type https://cyclonedx.org/bom` checks the SBOM attestation.
 
@@ -151,7 +151,7 @@ The server command:
 #### Natively, with PHP 8.5
 
 ```bash
-git clone https://github.com/Alpine-Ronin/airlock.git ~/airlock
+git clone https://github.com/alpine-ronin/airlock.git ~/airlock
 ```
 
 ```bash
@@ -180,7 +180,7 @@ php ~/airlock/bin/console mcp:server
 #### With Docker (no PHP needed)
 
 ```bash
-git clone https://github.com/Alpine-Ronin/airlock.git ~/airlock && docker build -t airlock ~/airlock
+git clone https://github.com/alpine-ronin/airlock.git ~/airlock && docker build -t airlock ~/airlock
 ```
 
 ```bash
@@ -318,7 +318,7 @@ the agent.
 Installed with a binary, you have no clone of the repository yet; make one first:
 
 ```bash
-git clone --depth 1 https://github.com/Alpine-Ronin/airlock.git ~/airlock
+git clone --depth 1 https://github.com/alpine-ronin/airlock.git ~/airlock
 ```
 
 ```bash

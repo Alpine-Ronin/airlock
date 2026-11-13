@@ -51,7 +51,7 @@ final class BinaryUpdaterTest extends TestCase
         $update = $this->updater($this->release('v1.0.0', 'new'))->toLatest(self::BINARY, 'v1.0.0');
 
         self::assertNull($update->checkedBinary);
-        self::assertSame(['https://api.github.com/repos/Alpine-Ronin/airlock/releases/latest'], $this->requestedUrls);
+        self::assertSame(['https://api.github.com/repos/alpine-ronin/airlock/releases/latest'], $this->requestedUrls);
     }
 
     public function testAGivenVersionIsInstalledFromItsRelease(): void
@@ -60,7 +60,7 @@ final class BinaryUpdaterTest extends TestCase
 
         self::assertNotNull($update->checkedBinary);
         self::assertSame('older', file_get_contents($update->checkedBinary));
-        self::assertNotContains('https://api.github.com/repos/Alpine-Ronin/airlock/releases/latest', $this->requestedUrls);
+        self::assertNotContains('https://api.github.com/repos/alpine-ronin/airlock/releases/latest', $this->requestedUrls);
     }
 
     public function testABinaryThatDoesNotMatchItsChecksumIsRefused(): void
@@ -117,7 +117,7 @@ final class BinaryUpdaterTest extends TestCase
     private function release(string $tag, string $binary): \Closure
     {
         return static function (string $method, string $url) use ($tag, $binary): MockResponse {
-            $download = \sprintf('https://github.com/Alpine-Ronin/airlock/releases/download/%s/', $tag);
+            $download = \sprintf('https://github.com/alpine-ronin/airlock/releases/download/%s/', $tag);
 
             return match (true) {
                 str_ends_with($url, '/releases/latest') => new MockResponse((string) json_encode(['tag_name' => $tag])),
