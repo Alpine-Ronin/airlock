@@ -57,7 +57,7 @@ final class GitHubCliAttestationCheckTest extends KernelTestCase
         self::assertSame([
             'auth token --hostname github.com',
             'auth status --hostname github.com --active',
-            'attestation verify /tmp/airlock-new --hostname github.com --repo Alpine-Ronin/airlock --cert-identity-regex ^https\://github\.com/Alpine\-Ronin/airlock/\.github/workflows/binaries\.yaml@refs/tags/v1\.2\.3$',
+            'attestation verify /tmp/airlock-new --hostname github.com --repo alpine-ronin/airlock --cert-identity-regex ^https\://github\.com/alpine\-ronin/airlock/\.github/workflows/binaries\.yaml@refs/tags/v1\.2\.3$',
         ], $this->ghCalls());
     }
 

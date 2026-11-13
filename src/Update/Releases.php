@@ -12,7 +12,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final readonly class Releases
 {
-    public const string REPOSITORY = 'Alpine-Ronin/airlock';
+    public const string REPOSITORY = 'alpine-ronin/airlock';
 
     public function __construct(
         private HttpClientInterface $httpClient,
