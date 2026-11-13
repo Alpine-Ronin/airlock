@@ -3,16 +3,16 @@
 # release's SHA256SUMS and, with the GitHub CLI logged in, its attestation: that this repository's release workflow
 # built it, from the release's tag.
 #
-#   curl -fsSL https://raw.githubusercontent.com/hbenabdallah/airlock/main/install.sh | sh
-#   curl -fsSL https://raw.githubusercontent.com/hbenabdallah/airlock/main/install.sh | sh -s -- 1.0.0
+#   curl -fsSL https://raw.githubusercontent.com/Alpine-Ronin/airlock/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/Alpine-Ronin/airlock/main/install.sh | sh -s -- 1.0.0
 #
 # AIRLOCK_INSTALL_DIR picks where it goes (default: ~/.local/bin). A first install, with no airlock there yet, also
 # downloads one small file from the project's "installs" release, so that its download count says how many people
 # installed Airlock; AIRLOCK_NO_COUNT=1 skips it.
 set -eu
 
-releases="${AIRLOCK_RELEASES_URL:-https://github.com/hbenabdallah/airlock/releases}"
-repository=hbenabdallah/airlock
+releases="${AIRLOCK_RELEASES_URL:-https://github.com/Alpine-Ronin/airlock/releases}"
+repository=Alpine-Ronin/airlock
 release_workflow="https://github.com/$repository/.github/workflows/binaries.yaml"
 install_dir="${AIRLOCK_INSTALL_DIR:-$HOME/.local/bin}"
 count_url="$releases/download/installs/first-install.txt"

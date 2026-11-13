@@ -5,7 +5,7 @@ in an issue.
 
 ## Reporting
 
-Open a private report on GitHub: [Report a vulnerability](https://github.com/hbenabdallah/airlock/security/advisories/new).
+Open a private report on GitHub: [Report a vulnerability](https://github.com/Alpine-Ronin/airlock/security/advisories/new).
 Say which version (`airlock --version`, or `git rev-parse HEAD` in the clone when you run it from source or
 Docker), on which system, with which client, and the shortest steps that show it.
 You get an answer within seven days, and the fix is credited to you unless you would rather not.
